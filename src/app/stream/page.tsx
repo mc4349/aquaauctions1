@@ -19,8 +19,8 @@ import {
   query,
   orderBy,
   doc,
-} from "@/lib/firestore";
-import type { DocumentData } from "@/lib/firestore";
+} from "../../lib/firestore"; // 👈 changed to relative
+import type { DocumentData } from "../../lib/firestore"; // 👈 changed to relative
 
 type Item = {
   id: string;
