@@ -1,81 +1,113 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import AgoraRTC, {
-  IAgoraRTCClient,
-  IRemoteAudioTrack,
-  IRemoteVideoTrack,
-} from "agora-rtc-sdk-ng";
+import AgoraRTC, { IAgoraRTCClient, IRemoteAudioTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
+import { onSnapshot, doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type ActiveView = {
+  id: string | null;
+  name?: string;
+  highestBid?: number;
+  endsAt?: number | null;
+};
 
 export default function LiveViewerPage() {
-  // Read the dynamic route param: /live/[channel]
   const params = useParams<{ channel: string }>();
   const channel = Array.isArray(params.channel) ? params.channel[0] : params.channel;
-
   const videoRef = useRef<HTMLDivElement | null>(null);
 
+  const [client, setClient] = useState<IAgoraRTCClient | null>(null);
+  const [active, setActive] = useState<ActiveView>({ id: null });
+  const [remaining, setRemaining] = useState<number>(0);
+
+  // Join and render remote stream
   useEffect(() => {
-    let client: IAgoraRTCClient | null = null;
+    let c: IAgoraRTCClient | null = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    setClient(c);
 
-    const run = async () => {
-      // Create a viewer client
-      client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-
-      // Subscribe when the seller publishes tracks
-      client.on("user-published", async (user: any, mediaType: "video" | "audio") => {
-        await client!.subscribe(user, mediaType);
-
-        if (mediaType === "video") {
-          const track = user.videoTrack as IRemoteVideoTrack | null;
-          if (track && videoRef.current) {
-            const container = document.createElement("div");
-            container.style.width = "100%";
-            container.style.maxWidth = "900px";
-            container.style.aspectRatio = "16/9";
-            container.style.borderRadius = "12px";
-            container.style.overflow = "hidden";
-
-            // Clear any previous element and mount
-            videoRef.current.innerHTML = "";
-            videoRef.current.appendChild(container);
-            track.play(container);
-          }
+    c.on("user-published", async (user: any, mediaType: "video" | "audio") => {
+      await c!.subscribe(user, mediaType);
+      if (mediaType === "video") {
+        const track = user.videoTrack as IRemoteVideoTrack | null;
+        if (track && videoRef.current) {
+          const container = document.createElement("div");
+          container.style.width = "100%";
+          container.style.maxWidth = "900px";
+          container.style.aspectRatio = "16/9";
+          container.style.borderRadius = "12px";
+          container.style.overflow = "hidden";
+          videoRef.current.innerHTML = "";
+          videoRef.current.appendChild(container);
+          track.play(container);
         }
+      }
+      if (mediaType === "audio") {
+        const aTrack = user.audioTrack as IRemoteAudioTrack | null;
+        aTrack?.play();
+      }
+    });
 
-        if (mediaType === "audio") {
-          const aTrack = user.audioTrack as IRemoteAudioTrack | null;
-          aTrack?.play();
-        }
-      });
+    c.on("user-unpublished", () => {
+      if (videoRef.current) videoRef.current.innerHTML = "";
+    });
 
-      client.on("user-unpublished", () => {
-        if (videoRef.current) videoRef.current.innerHTML = "";
-      });
-
+    (async () => {
       const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-      await client.join(APP_ID, channel, null, null);
-    };
+      await c!.join(APP_ID, channel, null, null);
+    })();
 
-    run();
-
-    return () => {
-      (async () => {
-        try {
-          if (client) await client.leave();
-        } catch {
-          // ignore
-        }
-      })();
-    };
+    return () => { (async () => { try { await c?.leave(); } catch {} })(); };
   }, [channel]);
+
+  // Watch currentItemId and the active item doc
+  useEffect(() => {
+    const streamRef = doc(db, `livestreams/${channel}`);
+    const unsub = onSnapshot(streamRef, async (snap) => {
+      const data = snap.data() as any;
+      const itemId = data?.currentItemId ?? null;
+      if (!itemId) { setActive({ id: null }); return; }
+
+      const itemRef = doc(db, `livestreams/${channel}/items/${itemId}`);
+      const itemSnap = await getDoc(itemRef);
+      const it = itemSnap.data() as any;
+      setActive({ id: itemId, name: it?.name, highestBid: it?.highestBid, endsAt: it?.endsAt ?? null });
+    });
+    return () => unsub();
+  }, [channel]);
+
+  // Countdown from endsAt
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!active?.endsAt) { setRemaining(0); return; }
+      const ms = Math.max(0, active.endsAt - Date.now());
+      setRemaining(Math.ceil(ms / 1000));
+    }, 250);
+    return () => clearInterval(id);
+  }, [active?.endsAt]);
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Live: {channel}</h1>
       <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
+
+      {active.id ? (
+        <div className="rounded-lg border p-4 flex items-center justify-between">
+          <div>
+            <div className="font-semibold">{active.name ?? "Active Item"}</div>
+            <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
+          </div>
+          <div className="text-xl font-bold tabular-nums">
+            {remaining}s
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">No active item yet.</p>
+      )}
+
       <p className="text-sm text-gray-500">
-        If you don’t see video, make sure the seller is live on this channel.
+        Timer is synced from the seller’s activation (endsAt in Firestore). Bidding comes next.
       </p>
     </div>
   );
