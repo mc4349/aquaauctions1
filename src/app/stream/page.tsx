@@ -1,7 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
+import AgoraRTC, {
+  IAgoraRTCClient,
+  ICameraVideoTrack,
+  IMicrophoneAudioTrack,
+} from "agora-rtc-sdk-ng";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  ensureStream,
+  addQueueItem,
+  activateItem,
+  clearActive,
+  endStream,
+  onSnapshot,
+  collection,
+  query,
+  orderBy,
+  doc,
+} from "@/lib/firestore";
+import type { DocumentData } from "@/lib/firestore";
+
+type Item = {
+  id: string;
+  name: string;
+  startingPrice: number;
+  durationSec: number;
+  status: "queued" | "active" | "sold" | "passed";
+  highestBid?: number;
+  endsAt?: number | null;
+};
 
 export default function StreamPage() {
   const videoRef = useRef<HTMLDivElement | null>(null);
@@ -9,24 +38,38 @@ export default function StreamPage() {
   const [cam, setCam] = useState<ICameraVideoTrack | null>(null);
   const [mic, setMic] = useState<IMicrophoneAudioTrack | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [channel, setChannel] = useState("aquaauctions-demo"); // simple default for testing
+
+  const [channel, setChannel] = useState("aqua-demo");
+  const [userUid, setUserUid] = useState<string | null>(null);
+
+  // queue form
+  const [name, setName] = useState("");
+  const [startingPrice, setStartingPrice] = useState(5);
+  const [durationSec, setDurationSec] = useState(30);
+
+  const [items, setItems] = useState<Item[]>([]);
+  const [currentItemId, setCurrentItemId] = useState<string | null>(null);
 
   const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-  const TOKEN = null; // tokenless for local testing; we’ll secure later
+  const TOKEN = null;
 
+  // listen auth
   useEffect(() => {
-    // Use 'live' mode for streaming; 'rtc' also works for a quick test
+    const unsub = onAuthStateChanged(auth, (u) => setUserUid(u?.uid ?? null));
+    return () => unsub();
+  }, []);
+
+  // create client
+  useEffect(() => {
     const c = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     setClient(c);
     return () => {
-      // cleanup on unmount
       (async () => {
         try {
           if (cam) cam.close();
           if (mic) mic.close();
           if (c) {
-            const tracks = cam && mic ? [mic, cam] : cam ? [cam] : mic ? [mic] : [];
-            if (tracks.length) await c.unpublish(tracks as any);
+            await c.unpublish();
             await c.leave();
           }
         } catch {}
@@ -35,8 +78,49 @@ export default function StreamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // watch queue + current item
+  useEffect(() => {
+    if (!channel) return;
+
+    // items listener
+    const q = query(
+      collection(db, "livestreams", channel, "items"),
+      orderBy("createdAt", "asc")
+    );
+    const unsubItems = onSnapshot(q, (snap: any) => {
+      const list: Item[] = [];
+      snap.forEach((d: any) => {
+        const data = d.data() as DocumentData;
+        list.push({
+          id: d.id,
+          name: data.name,
+          startingPrice: data.startingPrice,
+          durationSec: data.durationSec,
+          status: data.status,
+          highestBid: data.highestBid,
+          endsAt: data.endsAt ?? null,
+        });
+      });
+      setItems(list);
+    });
+
+    // stream listener (for currentItemId)
+    const streamRef = doc(db, "livestreams", channel);
+    const unsubStream = onSnapshot(streamRef, (d: any) => {
+      const data = d.data() as DocumentData | undefined;
+      setCurrentItemId(data?.currentItemId ?? null);
+    });
+
+    return () => {
+      unsubItems();
+      unsubStream();
+    };
+  }, [channel]);
+
   const start = async () => {
-    if (!client) return;
+    if (!client || !userUid) return alert("Sign in first.");
+    await ensureStream(channel, userUid);
+
     await client.join(APP_ID, channel, TOKEN, null);
     const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
     const camTrack = await AgoraRTC.createCameraVideoTrack();
@@ -45,7 +129,6 @@ export default function StreamPage() {
     setCam(camTrack);
     setIsLive(true);
 
-    // Render local video in the container
     if (videoRef.current) {
       const container = document.createElement("div");
       container.style.width = "100%";
@@ -62,6 +145,7 @@ export default function StreamPage() {
   const stop = async () => {
     if (!client) return;
     try {
+      await endStream(channel);
       if (cam) {
         cam.stop();
         cam.close();
@@ -81,19 +165,31 @@ export default function StreamPage() {
   };
 
   const toggleCam = async () => {
-    if (!cam) return;
-    if ((cam as any).enabled) await cam.setEnabled(false);
-    else await cam.setEnabled(true);
+    if (cam) await cam.setEnabled(!(cam as any).enabled);
+  };
+  const toggleMic = async () => {
+    if (mic) await mic.setEnabled(!(mic as any).enabled);
   };
 
-  const toggleMic = async () => {
-    if (!mic) return;
-    if ((mic as any).enabled) await mic.setEnabled(false);
-    else await mic.setEnabled(true);
+  const addItem = async () => {
+    if (!userUid) return alert("Sign in first.");
+    if (!name.trim()) return alert("Enter a name");
+    await addQueueItem(channel, { name, startingPrice, durationSec });
+    setName("");
+    setStartingPrice(5);
+    setDurationSec(30);
+  };
+
+  const activate = async (id: string, dur: number) => {
+    await activateItem(channel, id, dur);
+  };
+
+  const endActive = async () => {
+    await clearActive(channel);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Go Live</h1>
 
       <div className="flex items-center gap-2">
@@ -106,15 +202,24 @@ export default function StreamPage() {
         />
       </div>
 
-      <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
+      <div
+        ref={videoRef}
+        className="w-full flex justify-center bg-gray-50 rounded-lg py-2"
+      />
 
       <div className="flex flex-wrap gap-3">
         {!isLive ? (
-          <button onClick={start} className="px-4 py-2 rounded bg-green-600 text-white">
+          <button
+            onClick={start}
+            className="px-4 py-2 rounded bg-green-600 text-white"
+          >
             Start Stream
           </button>
         ) : (
-          <button onClick={stop} className="px-4 py-2 rounded bg-red-600 text-white">
+          <button
+            onClick={stop}
+            className="px-4 py-2 rounded bg-red-600 text-white"
+          >
             End Stream
           </button>
         )}
@@ -126,8 +231,89 @@ export default function StreamPage() {
         </button>
       </div>
 
+      {/* Queue composer */}
+      <div className="rounded-lg border p-4 space-y-3">
+        <h2 className="font-semibold">Add Item to Queue</h2>
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            className="border rounded px-2 py-1"
+            placeholder="Item name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            type="number"
+            className="border rounded px-2 py-1 w-28"
+            placeholder="Starting $"
+            value={startingPrice}
+            onChange={(e) =>
+              setStartingPrice(parseFloat(e.target.value || "0"))
+            }
+          />
+          <select
+            className="border rounded px-2 py-1"
+            value={durationSec}
+            onChange={(e) => setDurationSec(parseInt(e.target.value))}
+          >
+            <option value={30}>30s</option>
+            <option value={60}>1m</option>
+            <option value={120}>2m</option>
+          </select>
+          <button
+            onClick={addItem}
+            className="px-3 py-2 rounded bg-black text-white"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Queue list */}
+      <div className="rounded-lg border p-4 space-y-2">
+        <h2 className="font-semibold">Queue</h2>
+        {items.length === 0 && (
+          <p className="text-sm text-gray-500">No items yet.</p>
+        )}
+        <ul className="space-y-2">
+          {items.map((it) => (
+            <li
+              key={it.id}
+              className="flex items-center justify-between border rounded p-2"
+            >
+              <div>
+                <div className="font-medium">{it.name}</div>
+                <div className="text-xs text-gray-500">
+                  ${it.startingPrice} • {it.durationSec}s • {it.status}
+                  {it.status === "active" && it.endsAt
+                    ? ` • ends at ${new Date(it.endsAt).toLocaleTimeString()}`
+                    : ""}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {currentItemId === it.id ? (
+                  <button
+                    onClick={endActive}
+                    className="px-3 py-1 rounded bg-orange-500 text-white"
+                  >
+                    End Active
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => activate(it.id, it.durationSec)}
+                    className="px-3 py-1 rounded bg-green-600 text-white"
+                  >
+                    Activate
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <p className="text-sm text-gray-500">
-        Tip: share the channel name with viewers. They can watch at <code>/live/&lt;channel&gt;</code>.
+        Only one item can be active at a time. Activating sets a countdown
+        (endsAt) in Firestore for viewers.
       </p>
     </div>
   );
