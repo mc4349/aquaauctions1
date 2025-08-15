@@ -4,16 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
-const tabs = [
-  { href: "/", label: "Home" },
-  { href: "/explore", label: "Explore" },
-  { href: "/alerts", label: "Alerts" },
-  { href: "/account", label: "Account" },
-];
-
 export default function NavBar() {
   const pathname = usePathname();
   const { user } = useAuth();
+
+  // Default tabs
+  const tabs = [
+    { href: "/", label: "Home" },
+    { href: "/explore", label: "Explore" },
+    { href: "/alerts", label: "Alerts" },
+  ];
+
+  // If signed in, add the Stream tab
+  if (user) {
+    tabs.push({ href: "/stream", label: "Stream" });
+  }
+
+  // Account tab is always visible
+  tabs.push({ href: "/account", label: "Account" });
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur">
