@@ -83,6 +83,55 @@ export async function clearActive(channel: string) {
   await updateDoc(streamRef, { currentItemId: null });
 }
 
+// ----- Bidding -----
+export async function placeBid(
+  channel: string,
+  itemId: string,
+  amount: number,
+  bidderUid: string
+) {
+  const itemRef = doc(db, "livestreams", channel, "items", itemId);
+  try {
+    await updateDoc(itemRef, {
+      highestBid: amount,
+      highestBidderUid: bidderUid,
+    });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "bid_failed" };
+  }
+}
+
+// ----- Chat -----
+export async function sendMessage(
+  channel: string,
+  uid: string,
+  name: string | null | undefined,
+  text: string
+) {
+  const messagesRef = collection(db, "livestreams", channel, "messages");
+  return addDoc(messagesRef, {
+    uid,
+    name: name ?? null,
+    text: text.trim(),
+    createdAt: serverTimestamp(),
+  });
+}
+
+export function listenMessages(
+  channel: string,
+  cb: (msgs: Array<{ id: string; uid: string; name?: string | null; text: string; createdAt?: any }>) => void
+) {
+  const q = query(
+    collection(db, "livestreams", channel, "messages"),
+    orderBy("createdAt", "asc")
+  );
+  return onSnapshot(q, (snap) => {
+    const msgs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+    cb(msgs);
+  });
+}
+
 // Re-export runtime helpers
 export {
   doc,
@@ -97,5 +146,5 @@ export {
   getDoc,
 };
 
-// Re-export types (type-only to satisfy isolatedModules)
+// Re-export types (type-only)
 export type { DocumentData, DocumentReference, CollectionReference };

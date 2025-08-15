@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-// ⬇️ Types only at the top
 import type {
   IAgoraRTCClient,
   IRemoteAudioTrack,
   IRemoteVideoTrack,
 } from "agora-rtc-sdk-ng";
-
 import { onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { placeBid } from "@/lib/firestore";
+import Chat from "@/components/Chat";
+import { useAuth } from "@/components/AuthProvider";
 
 type ActiveView = {
   id: string | null;
@@ -24,10 +25,13 @@ export default function LiveViewerPage() {
   const channel = Array.isArray(params.channel) ? params.channel[0] : params.channel;
   const videoRef = useRef<HTMLDivElement | null>(null);
   const agoraRef = useRef<any>(null);
+  const { user, loginWithGoogle } = useAuth();
 
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [active, setActive] = useState<ActiveView>({ id: null });
   const [remaining, setRemaining] = useState<number>(0);
+  const [bid, setBid] = useState<number>(0);
+  const [bidMsg, setBidMsg] = useState<string>("");
 
   // Join and render remote stream with dynamic import
   useEffect(() => {
@@ -93,7 +97,9 @@ export default function LiveViewerPage() {
       const itemRef = doc(db, `livestreams/${channel}/items/${itemId}`);
       const itemSnap = await getDoc(itemRef);
       const it = itemSnap.data() as any;
-      setActive({ id: itemId, name: it?.name, highestBid: it?.highestBid, endsAt: it?.endsAt ?? null });
+      const hb = typeof it?.highestBid === "number" ? it.highestBid : 0;
+      setActive({ id: itemId, name: it?.name, highestBid: hb, endsAt: it?.endsAt ?? null });
+      setBid(hb + 1);
     });
     return () => unsub();
   }, [channel]);
@@ -108,27 +114,68 @@ export default function LiveViewerPage() {
     return () => clearInterval(id);
   }, [active?.endsAt]);
 
+  const onPlaceBid = async () => {
+    setBidMsg("");
+    if (!user) { setBidMsg("Please sign in to bid."); return; }
+    if (!active.id) { setBidMsg("No active item."); return; }
+    if (!bid || bid <= (active.highestBid ?? 0)) {
+      setBidMsg(`Your bid must be greater than $${active.highestBid ?? 0}.`);
+      return;
+    }
+    const res = await placeBid(channel, active.id, bid, user.uid);
+    if (!res.ok) {
+      setBidMsg("Bid failed (maybe someone outbid you first or timer ended). Try again.");
+    } else {
+      setBidMsg("Bid placed!");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Live: {channel}</h1>
       <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
 
       {active.id ? (
-        <div className="rounded-lg border p-4 flex items-center justify-between">
-          <div>
-            <div className="font-semibold">{active.name ?? "Active Item"}</div>
-            <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold">{active.name ?? "Active Item"}</div>
+              <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
+            </div>
+            <div className="text-xl font-bold tabular-nums">
+              {remaining}s
+            </div>
           </div>
-          <div className="text-xl font-bold tabular-nums">
-            {remaining}s
+
+          <div className="flex gap-2 items-center">
+            <input
+              type="number"
+              className="border rounded px-2 py-1 w-32"
+              value={bid}
+              min={(active.highestBid ?? 0) + 1}
+              onChange={(e) => setBid(parseFloat(e.target.value || "0"))}
+            />
+            {user ? (
+              <button onClick={onPlaceBid} className="px-3 py-2 rounded bg-green-600 text-white">
+                Place Bid
+              </button>
+            ) : (
+              <button onClick={loginWithGoogle} className="px-3 py-2 rounded bg-blue-600 text-white">
+                Sign in to Bid
+              </button>
+            )}
           </div>
+          {bidMsg && <p className="text-sm text-gray-600">{bidMsg}</p>}
         </div>
       ) : (
         <p className="text-sm text-gray-500">No active item yet.</p>
       )}
 
+      {/* Chat */}
+      <Chat channel={channel} />
+
       <p className="text-sm text-gray-500">
-        Timer is synced from the seller’s activation (endsAt in Firestore). Bidding comes next.
+        Bids must increase and only count while the item is active. We’ll add payments with Stripe next.
       </p>
     </div>
   );

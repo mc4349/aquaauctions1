@@ -1,7 +1,8 @@
+// src/app/stream/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-// ⬇️ Import ONLY types at the top. No value import of Agora here.
+// Types only (no runtime import on the server)
 import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -36,7 +37,12 @@ type Item = {
 
 export default function StreamPage() {
   const videoRef = useRef<HTMLDivElement | null>(null);
-  const agoraRef = useRef<any>(null); // holds the dynamically imported Agora module
+
+  // Keep latest Agora client & tracks in refs to avoid stale closures
+  const agoraRef = useRef<any>(null);
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
+  const camRef = useRef<ICameraVideoTrack | null>(null);
+  const micRef = useRef<IMicrophoneAudioTrack | null>(null);
 
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [cam, setCam] = useState<ICameraVideoTrack | null>(null);
@@ -65,33 +71,45 @@ export default function StreamPage() {
 
   // Dynamically import Agora on the client and create the client
   useEffect(() => {
-    let mounted = true;
+    let disposed = false;
+    let localClient: IAgoraRTCClient | null = null;
 
     (async () => {
-      const Agora = await import("agora-rtc-sdk-ng");
-      if (!mounted) return;
-      agoraRef.current = Agora.default;
+      const { default: AgoraRTC } = await import("agora-rtc-sdk-ng");
+      if (disposed) return;
 
-      const c = Agora.default.createClient({ mode: "rtc", codec: "vp8" });
-      setClient(c);
+      agoraRef.current = AgoraRTC;
+
+      localClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+      clientRef.current = localClient;
+      setClient(localClient);
     })();
 
     return () => {
-      mounted = false;
+      disposed = true;
       (async () => {
         try {
-          if (cam) cam.close();
-          if (mic) mic.close();
-          if (client) {
-            await client.unpublish();
-            await client.leave();
+          if (camRef.current) {
+            camRef.current.stop();
+            camRef.current.close();
+            camRef.current = null;
           }
-        } catch {}
+          if (micRef.current) {
+            micRef.current.stop();
+            micRef.current.close();
+            micRef.current = null;
+          }
+          if (localClient) {
+            await localClient.unpublish();
+            await localClient.leave();
+          }
+        } catch {
+          // ignore
+        } finally {
+          if (videoRef.current) videoRef.current.innerHTML = "";
+        }
       })();
-      // also clear the video container
-      if (videoRef.current) videoRef.current.innerHTML = "";
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Watch queue + current item
@@ -134,16 +152,20 @@ export default function StreamPage() {
   }, [channel]);
 
   const start = async () => {
-    if (!client || !userUid) return alert("Sign in first.");
     const AgoraRTC = agoraRef.current;
-    if (!AgoraRTC) return alert("Video engine not ready yet—try again in a second.");
+    const c = clientRef.current;
+    if (!userUid) return alert("Sign in first.");
+    if (!AgoraRTC || !c) return alert("Video engine not ready yet—try again in a second.");
 
     await ensureStream(channel, userUid);
 
-    await client.join(APP_ID, channel, TOKEN, null);
+    await c.join(APP_ID, channel, TOKEN, null);
     const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
     const camTrack = await AgoraRTC.createCameraVideoTrack();
-    await client.publish([micTrack, camTrack]);
+    await c.publish([micTrack, camTrack]);
+
+    micRef.current = micTrack;
+    camRef.current = camTrack;
     setMic(micTrack);
     setCam(camTrack);
     setIsLive(true);
@@ -162,19 +184,24 @@ export default function StreamPage() {
   };
 
   const stop = async () => {
-    if (!client) return;
+    const c = clientRef.current;
     try {
       await endStream(channel);
-      if (cam) {
-        cam.stop();
-        cam.close();
+
+      if (camRef.current) {
+        camRef.current.stop();
+        camRef.current.close();
+        camRef.current = null;
       }
-      if (mic) {
-        mic.stop();
-        mic.close();
+      if (micRef.current) {
+        micRef.current.stop();
+        micRef.current.close();
+        micRef.current = null;
       }
-      await client.unpublish();
-      await client.leave();
+      if (c) {
+        await c.unpublish();
+        await c.leave();
+      }
     } finally {
       setIsLive(false);
       setCam(null);
@@ -184,10 +211,13 @@ export default function StreamPage() {
   };
 
   const toggleCam = async () => {
-    if (cam) await cam.setEnabled(!(cam as any).enabled);
+    if (!camRef.current) return;
+    await camRef.current.setEnabled(!(camRef.current as any).enabled);
   };
+
   const toggleMic = async () => {
-    if (mic) await mic.setEnabled(!(mic as any).enabled);
+    if (!micRef.current) return;
+    await micRef.current.setEnabled(!(micRef.current as any).enabled);
   };
 
   const addItem = async () => {
