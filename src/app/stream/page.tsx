@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AgoraRTC, {
+// ⬇️ Import ONLY types at the top. No value import of Agora here.
+import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
 } from "agora-rtc-sdk-ng";
+
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -19,8 +21,8 @@ import {
   query,
   orderBy,
   doc,
-} from "../../lib/firestore"; // 👈 changed to relative
-import type { DocumentData } from "../../lib/firestore"; // 👈 changed to relative
+} from "../../lib/firestore";
+import type { DocumentData } from "../../lib/firestore";
 
 type Item = {
   id: string;
@@ -34,6 +36,8 @@ type Item = {
 
 export default function StreamPage() {
   const videoRef = useRef<HTMLDivElement | null>(null);
+  const agoraRef = useRef<any>(null); // holds the dynamically imported Agora module
+
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [cam, setCam] = useState<ICameraVideoTrack | null>(null);
   const [mic, setMic] = useState<IMicrophoneAudioTrack | null>(null);
@@ -53,32 +57,44 @@ export default function StreamPage() {
   const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
   const TOKEN = null;
 
-  // listen auth
+  // Listen auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUserUid(u?.uid ?? null));
     return () => unsub();
   }, []);
 
-  // create client
+  // Dynamically import Agora on the client and create the client
   useEffect(() => {
-    const c = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    setClient(c);
+    let mounted = true;
+
+    (async () => {
+      const Agora = await import("agora-rtc-sdk-ng");
+      if (!mounted) return;
+      agoraRef.current = Agora.default;
+
+      const c = Agora.default.createClient({ mode: "rtc", codec: "vp8" });
+      setClient(c);
+    })();
+
     return () => {
+      mounted = false;
       (async () => {
         try {
           if (cam) cam.close();
           if (mic) mic.close();
-          if (c) {
-            await c.unpublish();
-            await c.leave();
+          if (client) {
+            await client.unpublish();
+            await client.leave();
           }
         } catch {}
       })();
+      // also clear the video container
+      if (videoRef.current) videoRef.current.innerHTML = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // watch queue + current item
+  // Watch queue + current item
   useEffect(() => {
     if (!channel) return;
 
@@ -119,6 +135,9 @@ export default function StreamPage() {
 
   const start = async () => {
     if (!client || !userUid) return alert("Sign in first.");
+    const AgoraRTC = agoraRef.current;
+    if (!AgoraRTC) return alert("Video engine not ready yet—try again in a second.");
+
     await ensureStream(channel, userUid);
 
     await client.join(APP_ID, channel, TOKEN, null);

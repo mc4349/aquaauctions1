@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import AgoraRTC, { IAgoraRTCClient, IRemoteAudioTrack, IRemoteVideoTrack } from "agora-rtc-sdk-ng";
+// ⬇️ Types only at the top
+import type {
+  IAgoraRTCClient,
+  IRemoteAudioTrack,
+  IRemoteVideoTrack,
+} from "agora-rtc-sdk-ng";
+
 import { onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -17,48 +23,63 @@ export default function LiveViewerPage() {
   const params = useParams<{ channel: string }>();
   const channel = Array.isArray(params.channel) ? params.channel[0] : params.channel;
   const videoRef = useRef<HTMLDivElement | null>(null);
+  const agoraRef = useRef<any>(null);
 
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [active, setActive] = useState<ActiveView>({ id: null });
   const [remaining, setRemaining] = useState<number>(0);
 
-  // Join and render remote stream
+  // Join and render remote stream with dynamic import
   useEffect(() => {
-    let c: IAgoraRTCClient | null = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    setClient(c);
-
-    c.on("user-published", async (user: any, mediaType: "video" | "audio") => {
-      await c!.subscribe(user, mediaType);
-      if (mediaType === "video") {
-        const track = user.videoTrack as IRemoteVideoTrack | null;
-        if (track && videoRef.current) {
-          const container = document.createElement("div");
-          container.style.width = "100%";
-          container.style.maxWidth = "900px";
-          container.style.aspectRatio = "16/9";
-          container.style.borderRadius = "12px";
-          container.style.overflow = "hidden";
-          videoRef.current.innerHTML = "";
-          videoRef.current.appendChild(container);
-          track.play(container);
-        }
-      }
-      if (mediaType === "audio") {
-        const aTrack = user.audioTrack as IRemoteAudioTrack | null;
-        aTrack?.play();
-      }
-    });
-
-    c.on("user-unpublished", () => {
-      if (videoRef.current) videoRef.current.innerHTML = "";
-    });
+    let mounted = true;
 
     (async () => {
+      const Agora = await import("agora-rtc-sdk-ng");
+      if (!mounted) return;
+      agoraRef.current = Agora.default;
+
+      const c = Agora.default.createClient({ mode: "rtc", codec: "vp8" });
+      setClient(c);
+
+      c.on("user-published", async (user: any, mediaType: "video" | "audio") => {
+        await c.subscribe(user, mediaType);
+        if (mediaType === "video") {
+          const track = user.videoTrack as IRemoteVideoTrack | null;
+          if (track && videoRef.current) {
+            const container = document.createElement("div");
+            container.style.width = "100%";
+            container.style.maxWidth = "900px";
+            container.style.aspectRatio = "16/9";
+            container.style.borderRadius = "12px";
+            container.style.overflow = "hidden";
+            videoRef.current.innerHTML = "";
+            videoRef.current.appendChild(container);
+            track.play(container);
+          }
+        }
+        if (mediaType === "audio") {
+          const aTrack = user.audioTrack as IRemoteAudioTrack | null;
+          aTrack?.play();
+        }
+      });
+
+      c.on("user-unpublished", () => {
+        if (videoRef.current) videoRef.current.innerHTML = "";
+      });
+
       const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-      await c!.join(APP_ID, channel, null, null);
+      await c.join(APP_ID, channel, null, null);
     })();
 
-    return () => { (async () => { try { await c?.leave(); } catch {} })(); };
+    return () => {
+      mounted = false;
+      (async () => {
+        try {
+          if (client) await client.leave();
+        } catch {}
+      })();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
 
   // Watch currentItemId and the active item doc
