@@ -1,4 +1,3 @@
-// src/lib/firestore.ts
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -11,6 +10,7 @@ import {
   query,
   orderBy,
   getDoc,
+  where, // <-- ADDED THIS LINE!
 } from "firebase/firestore";
 import type {
   DocumentData,
@@ -144,6 +144,7 @@ export {
   query,
   orderBy,
   getDoc,
+  where, // <-- ADDED THIS LINE!
 };
 
 // Re-export types (type-only)
