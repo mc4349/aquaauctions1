@@ -23,31 +23,71 @@ type ActiveView = {
 export default function LiveViewerPage() {
   const params = useParams<{ channel: string }>();
   const channel = Array.isArray(params.channel) ? params.channel[0] : params.channel;
+
   const videoRef = useRef<HTMLDivElement | null>(null);
-  const agoraRef = useRef<any>(null);
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
+
   const { user, loginWithGoogle } = useAuth();
 
-  const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [active, setActive] = useState<ActiveView>({ id: null });
   const [remaining, setRemaining] = useState<number>(0);
   const [bid, setBid] = useState<number>(0);
   const [bidMsg, setBidMsg] = useState<string>("");
+  const [status, setStatus] = useState<string>("initializing…");
 
-  // Join and render remote stream with dynamic import
+  // ---- AGORA: join + robust subscribe (handles late joiners)
   useEffect(() => {
-    let mounted = true;
+    let disposed = false;
 
     (async () => {
-      const Agora = await import("agora-rtc-sdk-ng");
-      if (!mounted) return;
-      agoraRef.current = Agora.default;
+      setStatus("loading video engine…");
+      const { default: AgoraRTC } = await import("agora-rtc-sdk-ng");
+      if (disposed) return;
 
-      const c = Agora.default.createClient({ mode: "rtc", codec: "vp8" });
-      setClient(c);
+      const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+      clientRef.current = client;
 
-      c.on("user-published", async (user: any, mediaType: "video" | "audio") => {
-        await c.subscribe(user, mediaType);
-        if (mediaType === "video") {
+      // Subscribe when a remote user publishes
+      client.on("user-published", async (user: any, mediaType: "video" | "audio") => {
+        try {
+          await client.subscribe(user, mediaType);
+          if (mediaType === "video") {
+            const track = user.videoTrack as IRemoteVideoTrack | null;
+            if (track && videoRef.current) {
+              const container = document.createElement("div");
+              container.style.width = "100%";
+              container.style.maxWidth = "900px";
+              container.style.aspectRatio = "16/9";
+              container.style.borderRadius = "12px";
+              container.style.overflow = "hidden";
+              videoRef.current.innerHTML = "";
+              videoRef.current.appendChild(container);
+              track.play(container);
+              setStatus("playing remote video");
+            }
+          } else if (mediaType === "audio") {
+            const aTrack = user.audioTrack as IRemoteAudioTrack | null;
+            aTrack?.play();
+          }
+        } catch {
+          setStatus("failed to subscribe (see console)");
+        }
+      });
+
+      client.on("user-unpublished", () => {
+        if (videoRef.current) videoRef.current.innerHTML = "";
+        setStatus("seller unpublished");
+      });
+
+      setStatus("joining channel…");
+      const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
+      await client.join(APP_ID, channel, null, null);
+      setStatus("joined; waiting for video…");
+
+      // 👉 NEW: also try to subscribe to any already-present remote users
+      for (const user of client.remoteUsers) {
+        try {
+          await client.subscribe(user, "video");
           const track = user.videoTrack as IRemoteVideoTrack | null;
           if (track && videoRef.current) {
             const container = document.createElement("div");
@@ -59,34 +99,32 @@ export default function LiveViewerPage() {
             videoRef.current.innerHTML = "";
             videoRef.current.appendChild(container);
             track.play(container);
+            setStatus("playing remote video");
           }
+        } catch {
+          // ignore if not published yet
         }
-        if (mediaType === "audio") {
+        try {
+          await client.subscribe(user, "audio");
           const aTrack = user.audioTrack as IRemoteAudioTrack | null;
           aTrack?.play();
+        } catch {
+          // ignore if not published yet
         }
-      });
-
-      c.on("user-unpublished", () => {
-        if (videoRef.current) videoRef.current.innerHTML = "";
-      });
-
-      const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-      await c.join(APP_ID, channel, null, null);
+      }
     })();
 
     return () => {
-      mounted = false;
+      disposed = true;
       (async () => {
         try {
-          if (client) await client.leave();
+          await clientRef.current?.leave();
         } catch {}
       })();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
 
-  // Watch currentItemId and the active item doc
+  // ---- ACTIVE ITEM + COUNTDOWN
   useEffect(() => {
     const streamRef = doc(db, `livestreams/${channel}`);
     const unsub = onSnapshot(streamRef, async (snap) => {
@@ -104,7 +142,6 @@ export default function LiveViewerPage() {
     return () => unsub();
   }, [channel]);
 
-  // Countdown from endsAt
   useEffect(() => {
     const id = setInterval(() => {
       if (!active?.endsAt) { setRemaining(0); return; }
@@ -133,6 +170,8 @@ export default function LiveViewerPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Live: {channel}</h1>
+      <div className="text-xs text-gray-500">Status: {status}</div>
+
       <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
 
       {active.id ? (
@@ -142,9 +181,7 @@ export default function LiveViewerPage() {
               <div className="font-semibold">{active.name ?? "Active Item"}</div>
               <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
             </div>
-            <div className="text-xl font-bold tabular-nums">
-              {remaining}s
-            </div>
+            <div className="text-xl font-bold tabular-nums">{remaining}s</div>
           </div>
 
           <div className="flex gap-2 items-center">
