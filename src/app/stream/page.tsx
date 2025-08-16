@@ -1,8 +1,6 @@
-// src/app/stream/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-// Types only (no runtime import on the server)
 import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -22,6 +20,7 @@ import {
   query,
   orderBy,
   doc,
+  listenViewerCount,
 } from "../../lib/firestore";
 import type { DocumentData } from "../../lib/firestore";
 
@@ -38,7 +37,6 @@ type Item = {
 export default function StreamPage() {
   const videoRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep latest Agora client & tracks in refs to avoid stale closures
   const agoraRef = useRef<any>(null);
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const camRef = useRef<ICameraVideoTrack | null>(null);
@@ -52,24 +50,23 @@ export default function StreamPage() {
   const [channel, setChannel] = useState("aqua-demo");
   const [userUid, setUserUid] = useState<string | null>(null);
 
-  // queue form
-  const [name, setName] = useState("");
-  const [startingPrice, setStartingPrice] = useState(5);
-  const [durationSec, setDurationSec] = useState(30);
-
   const [items, setItems] = useState<Item[]>([]);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
+
+  // For timer and active item
+  const [activeItem, setActiveItem] = useState<Item | null>(null);
+  const [remaining, setRemaining] = useState<number>(0);
+
+  const [viewerCount, setViewerCount] = useState<number>(0);
 
   const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
   const TOKEN = null;
 
-  // Listen auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUserUid(u?.uid ?? null));
     return () => unsub();
   }, []);
 
-  // Dynamically import Agora on the client and create the client
   useEffect(() => {
     let disposed = false;
     let localClient: IAgoraRTCClient | null = null;
@@ -103,20 +100,18 @@ export default function StreamPage() {
             await localClient.unpublish();
             await localClient.leave();
           }
-        } catch {
-          // ignore
-        } finally {
+        } catch {}
+        finally {
           if (videoRef.current) videoRef.current.innerHTML = "";
         }
       })();
     };
   }, []);
 
-  // Watch queue + current item
+  // Watch queue + current item + active item
   useEffect(() => {
     if (!channel) return;
 
-    // items listener
     const q = query(
       collection(db, "livestreams", channel, "items"),
       orderBy("createdAt", "asc")
@@ -136,9 +131,12 @@ export default function StreamPage() {
         });
       });
       setItems(list);
+
+      // Find active item and update state
+      const active = list.find(it => it.status === "active");
+      setActiveItem(active || null);
     });
 
-    // stream listener (for currentItemId)
     const streamRef = doc(db, "livestreams", channel);
     const unsubStream = onSnapshot(streamRef, (d: any) => {
       const data = d.data() as DocumentData | undefined;
@@ -149,6 +147,22 @@ export default function StreamPage() {
       unsubItems();
       unsubStream();
     };
+  }, [channel]);
+
+  // Timer for active item
+  useEffect(() => {
+    if (!activeItem?.endsAt) { setRemaining(0); return; }
+    const id = setInterval(() => {
+      const ms = activeItem?.endsAt ? Math.max(0, activeItem.endsAt - Date.now()) : 0;
+      setRemaining(Math.ceil(ms / 1000));
+    }, 250);
+    return () => clearInterval(id);
+  }, [activeItem?.endsAt]);
+
+  // Viewer count (for streamer, real-time)
+  useEffect(() => {
+    const unsub = listenViewerCount(channel, setViewerCount);
+    return () => unsub();
   }, [channel]);
 
   const start = async () => {
@@ -237,9 +251,15 @@ export default function StreamPage() {
     await clearActive(channel);
   };
 
+  // queue form
+  const [name, setName] = useState("");
+  const [startingPrice, setStartingPrice] = useState(5);
+  const [durationSec, setDurationSec] = useState(30);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Go Live</h1>
+      <div className="text-xs text-gray-500">Viewers watching: {viewerCount}</div>
 
       <div className="flex items-center gap-2">
         <label className="text-sm">Channel:</label>
@@ -337,6 +357,11 @@ export default function StreamPage() {
                     ? ` • ends at ${new Date(it.endsAt).toLocaleTimeString()}`
                     : ""}
                 </div>
+                {it.status === "active" ? (
+                  <div className="text-xl font-bold tabular-nums">
+                    {remaining}s
+                  </div>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 {currentItemId === it.id ? (

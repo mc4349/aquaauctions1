@@ -7,7 +7,7 @@ import type {
   IRemoteAudioTrack,
   IRemoteVideoTrack,
 } from "agora-rtc-sdk-ng";
-import { onSnapshot, doc, getDoc } from "firebase/firestore";
+import { onSnapshot, doc, getDoc, addViewer, removeViewer, listenViewerCount } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { placeBid } from "@/lib/firestore";
 import Chat from "@/components/Chat";
@@ -23,71 +23,55 @@ type ActiveView = {
 export default function LiveViewerPage() {
   const params = useParams<{ channel: string }>();
   const channel = Array.isArray(params.channel) ? params.channel[0] : params.channel;
-
   const videoRef = useRef<HTMLDivElement | null>(null);
-  const clientRef = useRef<IAgoraRTCClient | null>(null);
-
+  const agoraRef = useRef<any>(null);
   const { user, loginWithGoogle } = useAuth();
 
+  const [client, setClient] = useState<IAgoraRTCClient | null>(null);
   const [active, setActive] = useState<ActiveView>({ id: null });
   const [remaining, setRemaining] = useState<number>(0);
   const [bid, setBid] = useState<number>(0);
   const [bidMsg, setBidMsg] = useState<string>("");
-  const [status, setStatus] = useState<string>("initializing…");
+  const [viewerCount, setViewerCount] = useState<number>(0);
 
-  // ---- AGORA: join + robust subscribe (handles late joiners)
+  // Access restriction: force login
   useEffect(() => {
-    let disposed = false;
+    if (!user) {
+      loginWithGoogle();
+    }
+  }, [user, loginWithGoogle]);
+
+  // Viewer presence tracking
+  useEffect(() => {
+    if (!user?.uid) return;
+    addViewer(channel, user.uid);
+    return () => {
+      removeViewer(channel, user.uid);
+    };
+  }, [channel, user?.uid]);
+
+  // Listen for viewer count
+  useEffect(() => {
+    const unsub = listenViewerCount(channel, setViewerCount);
+    return () => unsub();
+  }, [channel]);
+
+  // Join and render remote stream with dynamic import
+  useEffect(() => {
+    if (!user) return; // don't join if not logged in
+    let mounted = true;
 
     (async () => {
-      setStatus("loading video engine…");
-      const { default: AgoraRTC } = await import("agora-rtc-sdk-ng");
-      if (disposed) return;
+      const Agora = await import("agora-rtc-sdk-ng");
+      if (!mounted) return;
+      agoraRef.current = Agora.default;
 
-      const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-      clientRef.current = client;
+      const c = Agora.default.createClient({ mode: "rtc", codec: "vp8" });
+      setClient(c);
 
-      // Subscribe when a remote user publishes
-      client.on("user-published", async (user: any, mediaType: "video" | "audio") => {
-        try {
-          await client.subscribe(user, mediaType);
-          if (mediaType === "video") {
-            const track = user.videoTrack as IRemoteVideoTrack | null;
-            if (track && videoRef.current) {
-              const container = document.createElement("div");
-              container.style.width = "100%";
-              container.style.maxWidth = "900px";
-              container.style.aspectRatio = "16/9";
-              container.style.borderRadius = "12px";
-              container.style.overflow = "hidden";
-              videoRef.current.innerHTML = "";
-              videoRef.current.appendChild(container);
-              track.play(container);
-              setStatus("playing remote video");
-            }
-          } else if (mediaType === "audio") {
-            const aTrack = user.audioTrack as IRemoteAudioTrack | null;
-            aTrack?.play();
-          }
-        } catch {
-          setStatus("failed to subscribe (see console)");
-        }
-      });
-
-      client.on("user-unpublished", () => {
-        if (videoRef.current) videoRef.current.innerHTML = "";
-        setStatus("seller unpublished");
-      });
-
-      setStatus("joining channel…");
-      const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
-      await client.join(APP_ID, channel, null, null);
-      setStatus("joined; waiting for video…");
-
-      // 👉 NEW: also try to subscribe to any already-present remote users
-      for (const user of client.remoteUsers) {
-        try {
-          await client.subscribe(user, "video");
+      c.on("user-published", async (user: any, mediaType: "video" | "audio") => {
+        await c.subscribe(user, mediaType);
+        if (mediaType === "video") {
           const track = user.videoTrack as IRemoteVideoTrack | null;
           if (track && videoRef.current) {
             const container = document.createElement("div");
@@ -99,32 +83,32 @@ export default function LiveViewerPage() {
             videoRef.current.innerHTML = "";
             videoRef.current.appendChild(container);
             track.play(container);
-            setStatus("playing remote video");
           }
-        } catch {
-          // ignore if not published yet
         }
-        try {
-          await client.subscribe(user, "audio");
+        if (mediaType === "audio") {
           const aTrack = user.audioTrack as IRemoteAudioTrack | null;
           aTrack?.play();
-        } catch {
-          // ignore if not published yet
         }
-      }
+      });
+
+      c.on("user-unpublished", () => {
+        if (videoRef.current) videoRef.current.innerHTML = "";
+      });
+
+      const APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
+      await c.join(APP_ID, channel, null, null);
     })();
 
     return () => {
-      disposed = true;
-      (async () => {
-        try {
-          await clientRef.current?.leave();
-        } catch {}
-      })();
+      mounted = false;
+      if (client) {
+        client.leave().catch(() => {});
+      }
     };
-  }, [channel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, user]);
 
-  // ---- ACTIVE ITEM + COUNTDOWN
+  // Watch currentItemId and the active item doc
   useEffect(() => {
     const streamRef = doc(db, `livestreams/${channel}`);
     const unsub = onSnapshot(streamRef, async (snap) => {
@@ -142,10 +126,10 @@ export default function LiveViewerPage() {
     return () => unsub();
   }, [channel]);
 
+  // Countdown from endsAt
   useEffect(() => {
     const id = setInterval(() => {
-      if (!active?.endsAt) { setRemaining(0); return; }
-      const ms = Math.max(0, active.endsAt - Date.now());
+      const ms = active?.endsAt ? Math.max(0, active.endsAt - Date.now()) : 0;
       setRemaining(Math.ceil(ms / 1000));
     }, 250);
     return () => clearInterval(id);
@@ -167,11 +151,21 @@ export default function LiveViewerPage() {
     }
   };
 
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <h2 className="text-xl font-semibold">Please sign in to view this live auction.</h2>
+        <button onClick={loginWithGoogle} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">
+          Sign in with Google
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Live: {channel}</h1>
-      <div className="text-xs text-gray-500">Status: {status}</div>
-
+      <div className="text-xs text-gray-500">Viewers: {viewerCount}</div>
       <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
 
       {active.id ? (
@@ -181,7 +175,9 @@ export default function LiveViewerPage() {
               <div className="font-semibold">{active.name ?? "Active Item"}</div>
               <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
             </div>
-            <div className="text-xl font-bold tabular-nums">{remaining}s</div>
+            <div className="text-xl font-bold tabular-nums">
+              {remaining}s
+            </div>
           </div>
 
           <div className="flex gap-2 items-center">

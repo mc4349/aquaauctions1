@@ -10,7 +10,8 @@ import {
   query,
   orderBy,
   getDoc,
-  where, // <-- ADDED THIS LINE!
+  where,
+  deleteDoc,
 } from "firebase/firestore";
 import type {
   DocumentData,
@@ -49,7 +50,7 @@ export async function addQueueItem(
   item: {
     name: string;
     startingPrice: number;
-    durationSec: number; // 30 | 60 | 120
+    durationSec: number;
     imageUrl?: string;
     category?: "coral" | "fish" | "equipment";
   }
@@ -57,7 +58,7 @@ export async function addQueueItem(
   const itemsRef = collection(db, "livestreams", channel, "items");
   return addDoc(itemsRef, {
     ...item,
-    status: "queued", // queued | active | sold | passed
+    status: "queued",
     highestBid: item.startingPrice,
     highestBidderUid: null,
     createdAt: serverTimestamp(),
@@ -83,7 +84,6 @@ export async function clearActive(channel: string) {
   await updateDoc(streamRef, { currentItemId: null });
 }
 
-// ----- Bidding -----
 export async function placeBid(
   channel: string,
   itemId: string,
@@ -100,6 +100,22 @@ export async function placeBid(
   } catch (e: any) {
     return { ok: false, error: e?.message || "bid_failed" };
   }
+}
+
+// ----- Viewer presence -----
+export async function addViewer(channel: string, uid: string) {
+  const ref = doc(db, "livestreams", channel, "viewers", uid);
+  await setDoc(ref, { joinedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function removeViewer(channel: string, uid: string) {
+  const ref = doc(db, "livestreams", channel, "viewers", uid);
+  await deleteDoc(ref);
+}
+
+export function listenViewerCount(channel: string, cb: (count: number) => void) {
+  const ref = collection(db, "livestreams", channel, "viewers");
+  return onSnapshot(ref, snap => cb(snap.size));
 }
 
 // ----- Chat -----
@@ -144,7 +160,8 @@ export {
   query,
   orderBy,
   getDoc,
-  where, // <-- ADDED THIS LINE!
+  where,
+  deleteDoc,
 };
 
 // Re-export types (type-only)
