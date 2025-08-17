@@ -29,38 +29,38 @@ export default function BuyerOrdersPage() {
   };
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">Your Purchases</h1>
-      {orders.length === 0 && <p>No purchases yet.</p>}
-      <ul className="space-y-4">
+      {orders.length === 0 && (
+        <div className="rounded bg-yellow-50 p-4 text-yellow-700">No purchases yet.</div>
+      )}
+      <ul className="space-y-6">
         {orders.map(order => (
-          <li key={order.id} className="border rounded-lg p-4 bg-white shadow flex flex-col gap-2">
-            <div className="flex justify-between">
+          <li key={order.id} className="border rounded-lg p-6 bg-white shadow flex flex-col gap-2">
+            <div className="flex justify-between items-center">
               <div>
                 <div className="font-semibold text-lg">{order.itemName}</div>
-                <div className="text-sm text-gray-500">Seller: {order.sellerUid}</div>
+                <div className="text-sm text-gray-500">Seller: <span className="font-mono">{order.sellerUid}</span></div>
               </div>
-              <div>
-                <span className={`px-3 py-1 rounded text-sm font-bold
-                  ${order.status === "pending" ? "bg-yellow-200 text-yellow-800"
-                    : order.status === "paid" ? "bg-green-200 text-green-800"
-                    : order.status === "awaiting_payment" ? "bg-blue-200 text-blue-800"
-                    : order.status === "shipped" ? "bg-purple-200 text-purple-800"
-                    : order.status === "completed" ? "bg-gray-300 text-gray-700"
-                    : order.status === "cancelled" ? "bg-red-200 text-red-800"
-                    : "bg-gray-100 text-gray-600"
-                  }`}>
-                  {order.status}
-                </span>
-              </div>
+              <span className={`px-3 py-1 rounded text-sm font-bold
+                ${order.status === "pending" ? "bg-yellow-200 text-yellow-800"
+                  : order.status === "paid" ? "bg-green-200 text-green-800"
+                  : order.status === "awaiting_payment" ? "bg-blue-200 text-blue-800"
+                  : order.status === "shipped" ? "bg-purple-200 text-purple-800"
+                  : order.status === "completed" ? "bg-gray-300 text-gray-700"
+                  : order.status === "cancelled" ? "bg-red-200 text-red-800"
+                  : "bg-gray-100 text-gray-600"
+                }`}>
+                {order.status}
+              </span>
             </div>
             <div className="text-sm">Amount: <span className="font-mono">${order.amount}</span></div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-3">
               {order.status === "awaiting_payment" && (
                 <button
                   onClick={() => handleStatusChange(order.id, "paid")}
                   disabled={loadingOrderId === order.id}
-                  className="px-3 py-1 rounded bg-green-600 text-white text-sm"
+                  className="px-4 py-1 rounded bg-green-600 text-white text-sm shadow"
                 >
                   {loadingOrderId === order.id ? "..." : "Mark as Paid"}
                 </button>
@@ -70,14 +70,14 @@ export default function BuyerOrdersPage() {
                   <button
                     onClick={() => handleStatusChange(order.id, "completed")}
                     disabled={loadingOrderId === order.id}
-                    className="px-3 py-1 rounded bg-gray-700 text-white text-sm"
+                    className="px-4 py-1 rounded bg-gray-700 text-white text-sm shadow"
                   >
                     {loadingOrderId === order.id ? "..." : "Mark as Received"}
                   </button>
                   <button
                     onClick={() => handleStatusChange(order.id, "cancelled")}
                     disabled={loadingOrderId === order.id}
-                    className="px-3 py-1 rounded bg-red-600 text-white text-sm"
+                    className="px-4 py-1 rounded bg-red-600 text-white text-sm shadow"
                   >
                     {loadingOrderId === order.id ? "..." : "Cancel"}
                   </button>

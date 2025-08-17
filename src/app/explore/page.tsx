@@ -40,25 +40,25 @@ export default function ExplorePage() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Explore</h1>
-      <p>Search sellers, coral, fish, and equipment. (Coming next)</p>
-      <h2 className="text-xl font-semibold mt-4">Live Streams</h2>
+    <div className="space-y-8 max-w-2xl mx-auto">
+      <h1 className="text-3xl font-bold">Explore</h1>
+      <p className="text-gray-600">Search sellers, coral, fish, and equipment. <span className="italic text-xs">(Coming next)</span></p>
+      <h2 className="text-xl font-semibold mt-6">Live Streams</h2>
       {streams.length === 0 ? (
-        <p className="text-gray-500">No sellers are live right now.</p>
+        <div className="rounded bg-yellow-50 p-4 text-yellow-700">No sellers are live right now.</div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-4">
           {streams.map((s) => (
-            <li key={s.id} className="border rounded p-2 flex flex-col">
+            <li key={s.id} className="border rounded-lg p-4 bg-white shadow flex flex-col gap-2">
               <div>
-                <span className="font-semibold">{s.channel}</span>
+                <span className="font-semibold text-lg">{s.channel}</span>
                 <span className="text-xs text-gray-500 ml-2">
                   Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
                 </span>
               </div>
               <Link
                 href={`/live/${s.channel}`}
-                className="mt-2 px-3 py-1 bg-blue-600 text-white rounded w-fit"
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded shadow w-fit"
               >
                 View Live Stream
               </Link>

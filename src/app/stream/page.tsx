@@ -21,8 +21,8 @@ import {
   orderBy,
   doc,
   listenViewerCount,
-  createOrder, // <-- ADDED
-  getDoc, // <-- ADDED for fetching item after ending
+  createOrder,
+  getDoc,
 } from "../../lib/firestore";
 import type { DocumentData } from "../../lib/firestore";
 
@@ -278,12 +278,12 @@ export default function StreamPage() {
   const [durationSec, setDurationSec] = useState(30);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Go Live</h1>
-      <div className="text-xs text-gray-500">Viewers watching: {viewerCount}</div>
+    <div className="space-y-10 max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold">Go Live</h1>
+      <div className="text-xs text-gray-500 mb-2">Viewers watching: <span className="font-bold">{viewerCount}</span></div>
 
-      <div className="flex items-center gap-2">
-        <label className="text-sm">Channel:</label>
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-sm font-semibold">Channel:</label>
         <input
           className="border rounded px-2 py-1"
           value={channel}
@@ -294,36 +294,36 @@ export default function StreamPage() {
 
       <div
         ref={videoRef}
-        className="w-full flex justify-center bg-gray-50 rounded-lg py-2"
+        className="w-full flex justify-center bg-gray-100 rounded-lg py-2 shadow"
       />
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 mb-6">
         {!isLive ? (
           <button
             onClick={start}
-            className="px-4 py-2 rounded bg-green-600 text-white"
+            className="px-4 py-2 rounded bg-green-600 text-white shadow"
           >
             Start Stream
           </button>
         ) : (
           <button
             onClick={stop}
-            className="px-4 py-2 rounded bg-red-600 text-white"
+            className="px-4 py-2 rounded bg-red-600 text-white shadow"
           >
             End Stream
           </button>
         )}
-        <button onClick={toggleCam} className="px-4 py-2 rounded bg-gray-200">
+        <button onClick={toggleCam} className="px-4 py-2 rounded bg-gray-200 shadow">
           Toggle Camera
         </button>
-        <button onClick={toggleMic} className="px-4 py-2 rounded bg-gray-200">
+        <button onClick={toggleMic} className="px-4 py-2 rounded bg-gray-200 shadow">
           Toggle Mic
         </button>
       </div>
 
       {/* Queue composer */}
-      <div className="rounded-lg border p-4 space-y-3">
-        <h2 className="font-semibold">Add Item to Queue</h2>
+      <div className="rounded-lg border p-6 space-y-3 bg-white shadow">
+        <h2 className="font-semibold text-lg mb-2">Add Item to Queue</h2>
         <div className="flex flex-wrap gap-3 items-center">
           <input
             className="border rounded px-2 py-1"
@@ -351,7 +351,7 @@ export default function StreamPage() {
           </select>
           <button
             onClick={addItem}
-            className="px-3 py-2 rounded bg-black text-white"
+            className="px-3 py-2 rounded bg-black text-white shadow"
           >
             Add
           </button>
@@ -359,8 +359,8 @@ export default function StreamPage() {
       </div>
 
       {/* Queue list */}
-      <div className="rounded-lg border p-4 space-y-2">
-        <h2 className="font-semibold">Queue</h2>
+      <div className="rounded-lg border p-6 space-y-2 bg-white shadow">
+        <h2 className="font-semibold text-lg mb-2">Queue</h2>
         {items.length === 0 && (
           <p className="text-sm text-gray-500">No items yet.</p>
         )}
@@ -368,10 +368,10 @@ export default function StreamPage() {
           {items.map((it) => (
             <li
               key={it.id}
-              className="flex items-center justify-between border rounded p-2"
+              className="flex items-center justify-between border rounded p-3 bg-gray-50"
             >
               <div>
-                <div className="font-medium">{it.name}</div>
+                <div className="font-semibold">{it.name}</div>
                 <div className="text-xs text-gray-500">
                   ${it.startingPrice} • {it.durationSec}s • {it.status}
                   {it.status === "active" && it.endsAt
@@ -379,7 +379,7 @@ export default function StreamPage() {
                     : ""}
                 </div>
                 {it.status === "active" ? (
-                  <div className="text-xl font-bold tabular-nums">
+                  <div className="text-xl font-bold tabular-nums text-blue-600">
                     {remaining}s
                   </div>
                 ) : null}
@@ -388,14 +388,14 @@ export default function StreamPage() {
                 {currentItemId === it.id ? (
                   <button
                     onClick={endActive}
-                    className="px-3 py-1 rounded bg-orange-500 text-white"
+                    className="px-3 py-1 rounded bg-orange-500 text-white shadow"
                   >
                     End Active
                   </button>
                 ) : (
                   <button
                     onClick={() => activate(it.id, it.durationSec)}
-                    className="px-3 py-1 rounded bg-green-600 text-white"
+                    className="px-3 py-1 rounded bg-green-600 text-white shadow"
                   >
                     Activate
                   </button>
@@ -406,7 +406,7 @@ export default function StreamPage() {
         </ul>
       </div>
 
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-500 mt-2">
         Only one item can be active at a time. Activating sets a countdown
         (endsAt) in Firestore for viewers.
       </p>
