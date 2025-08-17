@@ -23,6 +23,7 @@ import {
   listenViewerCount,
   createOrder,
   getDoc,
+  deleteDoc, // <-- import for queue item delete
 } from "../../lib/firestore";
 import type { DocumentData } from "../../lib/firestore";
 
@@ -272,144 +273,161 @@ export default function StreamPage() {
   };
   // --- END UPDATED FUNCTION ---
 
+  // Delete a queue item
+  const deleteQueueItem = async (itemId: string) => {
+    await deleteDoc(doc(db, `livestreams/${channel}/items/${itemId}`));
+  };
+
   // queue form
   const [name, setName] = useState("");
   const [startingPrice, setStartingPrice] = useState(5);
   const [durationSec, setDurationSec] = useState(30);
 
   return (
-    <div className="space-y-10 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold">Go Live</h1>
-      <div className="text-xs text-gray-500 mb-2">Viewers watching: <span className="font-bold">{viewerCount}</span></div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+      <div className="space-y-10 max-w-3xl mx-auto pt-12">
+        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-6 text-center">Go Live</h1>
+        <div className="text-xs text-gray-500 mb-2 text-center">Viewers watching: <span className="font-bold">{viewerCount}</span></div>
 
-      <div className="flex items-center gap-2 mb-2">
-        <label className="text-sm font-semibold">Channel:</label>
-        <input
-          className="border rounded px-2 py-1"
-          value={channel}
-          onChange={(e) => setChannel(e.target.value)}
-          placeholder="channel-name"
+        <div className="flex items-center gap-2 mb-2 justify-center">
+          <label className="text-sm font-semibold">Channel:</label>
+          <input
+            className="border rounded px-2 py-1"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            placeholder="channel-name"
+          />
+        </div>
+
+        <div
+          ref={videoRef}
+          className="w-full flex justify-center bg-gray-100 rounded-lg py-2 shadow"
         />
-      </div>
 
-      <div
-        ref={videoRef}
-        className="w-full flex justify-center bg-gray-100 rounded-lg py-2 shadow"
-      />
-
-      <div className="flex flex-wrap gap-3 mb-6">
-        {!isLive ? (
-          <button
-            onClick={start}
-            className="px-4 py-2 rounded bg-green-600 text-white shadow"
-          >
-            Start Stream
+        <div className="flex flex-wrap gap-3 mb-6 justify-center">
+          {!isLive ? (
+            <button
+              onClick={start}
+              className="px-4 py-2 rounded-xl bg-green-600 text-white shadow font-bold"
+            >
+              Start Stream
+            </button>
+          ) : (
+            <button
+              onClick={stop}
+              className="px-4 py-2 rounded-xl bg-red-600 text-white shadow font-bold"
+            >
+              End Stream
+            </button>
+          )}
+          <button onClick={toggleCam} className="px-4 py-2 rounded-xl bg-gray-200 shadow font-bold">
+            Toggle Camera
           </button>
-        ) : (
-          <button
-            onClick={stop}
-            className="px-4 py-2 rounded bg-red-600 text-white shadow"
-          >
-            End Stream
-          </button>
-        )}
-        <button onClick={toggleCam} className="px-4 py-2 rounded bg-gray-200 shadow">
-          Toggle Camera
-        </button>
-        <button onClick={toggleMic} className="px-4 py-2 rounded bg-gray-200 shadow">
-          Toggle Mic
-        </button>
-      </div>
-
-      {/* Queue composer */}
-      <div className="rounded-lg border p-6 space-y-3 bg-white shadow">
-        <h2 className="font-semibold text-lg mb-2">Add Item to Queue</h2>
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            className="border rounded px-2 py-1"
-            placeholder="Item name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            type="number"
-            className="border rounded px-2 py-1 w-28"
-            placeholder="Starting $"
-            value={startingPrice}
-            onChange={(e) =>
-              setStartingPrice(parseFloat(e.target.value || "0"))
-            }
-          />
-          <select
-            className="border rounded px-2 py-1"
-            value={durationSec}
-            onChange={(e) => setDurationSec(parseInt(e.target.value))}
-          >
-            <option value={30}>30s</option>
-            <option value={60}>1m</option>
-            <option value={120}>2m</option>
-          </select>
-          <button
-            onClick={addItem}
-            className="px-3 py-2 rounded bg-black text-white shadow"
-          >
-            Add
+          <button onClick={toggleMic} className="px-4 py-2 rounded-xl bg-gray-200 shadow font-bold">
+            Toggle Mic
           </button>
         </div>
-      </div>
 
-      {/* Queue list */}
-      <div className="rounded-lg border p-6 space-y-2 bg-white shadow">
-        <h2 className="font-semibold text-lg mb-2">Queue</h2>
-        {items.length === 0 && (
-          <p className="text-sm text-gray-500">No items yet.</p>
-        )}
-        <ul className="space-y-2">
-          {items.map((it) => (
-            <li
-              key={it.id}
-              className="flex items-center justify-between border rounded p-3 bg-gray-50"
+        {/* Queue composer */}
+        <div className="rounded-xl border p-6 space-y-3 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow">
+          <h2 className="font-semibold text-lg mb-2">Add Item to Queue</h2>
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              className="border rounded px-2 py-1"
+              placeholder="Item name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              type="number"
+              className="border rounded px-2 py-1 w-28"
+              placeholder="Starting $"
+              value={startingPrice}
+              onChange={(e) =>
+                setStartingPrice(parseFloat(e.target.value || "0"))
+              }
+            />
+            <select
+              className="border rounded px-2 py-1"
+              value={durationSec}
+              onChange={(e) => setDurationSec(parseInt(e.target.value))}
             >
-              <div>
-                <div className="font-semibold">{it.name}</div>
-                <div className="text-xs text-gray-500">
-                  ${it.startingPrice} • {it.durationSec}s • {it.status}
-                  {it.status === "active" && it.endsAt
-                    ? ` • ends at ${new Date(it.endsAt).toLocaleTimeString()}`
-                    : ""}
-                </div>
-                {it.status === "active" ? (
-                  <div className="text-xl font-bold tabular-nums text-blue-600">
-                    {remaining}s
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex gap-2">
-                {currentItemId === it.id ? (
-                  <button
-                    onClick={endActive}
-                    className="px-3 py-1 rounded bg-orange-500 text-white shadow"
-                  >
-                    End Active
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => activate(it.id, it.durationSec)}
-                    className="px-3 py-1 rounded bg-green-600 text-white shadow"
-                  >
-                    Activate
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+              <option value={30}>30s</option>
+              <option value={60}>1m</option>
+              <option value={120}>2m</option>
+            </select>
+            <button
+              onClick={addItem}
+              className="px-3 py-2 rounded-xl bg-black text-white shadow font-bold"
+            >
+              Add
+            </button>
+          </div>
+        </div>
 
-      <p className="text-sm text-gray-500 mt-2">
-        Only one item can be active at a time. Activating sets a countdown
-        (endsAt) in Firestore for viewers.
-      </p>
+        {/* Queue list */}
+        <div className="rounded-xl border p-6 space-y-2 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow">
+          <h2 className="font-semibold text-lg mb-2">Queue</h2>
+          {items.length === 0 && (
+            <p className="text-sm text-gray-500">No items yet.</p>
+          )}
+          <ul className="space-y-2">
+            {items.map((it) => (
+              <li
+                key={it.id}
+                className="flex items-center justify-between border rounded p-3 bg-gray-50"
+              >
+                <div>
+                  <div className="font-semibold">{it.name}</div>
+                  <div className="text-xs text-gray-500">
+                    ${it.startingPrice} • {it.durationSec}s • {it.status}
+                    {it.status === "active" && it.endsAt
+                      ? ` • ends at ${new Date(it.endsAt).toLocaleTimeString()}`
+                      : ""}
+                  </div>
+                  {it.status === "active" ? (
+                    <div className="text-xl font-bold tabular-nums text-blue-600">
+                      {remaining}s
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex gap-2">
+                  {currentItemId === it.id ? (
+                    <button
+                      onClick={endActive}
+                      className="px-3 py-1 rounded-xl bg-orange-500 text-white shadow"
+                    >
+                      End Active
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => activate(it.id, it.durationSec)}
+                        className="px-3 py-1 rounded-xl bg-green-600 text-white shadow"
+                      >
+                        Activate
+                      </button>
+                      {it.status === "queued" && (
+                        <button
+                          onClick={() => deleteQueueItem(it.id)}
+                          className="px-3 py-1 rounded-xl bg-red-600 text-white shadow"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="text-sm text-gray-500 mt-2 text-center">
+          Only one item can be active at a time. Activating sets a countdown
+          (endsAt) in Firestore for viewers.
+        </p>
+      </div>
     </div>
   );
 }

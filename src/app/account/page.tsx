@@ -50,66 +50,70 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-lg mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Account</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+      <div className="space-y-8 max-w-lg mx-auto pt-12">
+        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-6 text-center">Account</h1>
 
-      {user ? (
-        <>
-          <div className="rounded-lg border p-6 bg-white shadow space-y-2">
-            <p><strong>Name:</strong> {user.displayName ?? "—"}</p>
-            <p><strong>Email:</strong> {user.email}</p>
-            <p><strong>UID:</strong> <span className="font-mono">{user.uid}</span></p>
-          </div>
+        {user ? (
+          <>
+            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow space-y-2">
+              <p><strong>Name:</strong> {user.displayName ?? "—"}</p>
+              <p><strong>Email:</strong> {user.email}</p>
+              <p><strong>UID:</strong> <span className="font-mono">{user.uid}</span></p>
+            </div>
 
-          <div className="rounded-lg border p-6 bg-white shadow space-y-2">
-            <h2 className="font-semibold text-lg mb-2">Payouts Setup</h2>
-            {loading ? (
-              <p className="text-blue-600">Loading...</p>
-            ) : stripeStatus === "connected" ? (
-              <div className="flex items-center gap-2 text-green-600 font-bold">
-                <span>✅ Connected</span>
-              </div>
-            ) : (
-              <button
-                onClick={handleStripeOnboard}
-                className="px-4 py-2 rounded bg-blue-600 text-white shadow"
-                disabled={loading}
+            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow space-y-2">
+              <h2 className="font-semibold text-lg mb-2">Payouts Setup</h2>
+              {loading ? (
+                <p className="text-blue-600">Loading...</p>
+              ) : stripeStatus === "connected" ? (
+                <div className="flex items-center gap-2 text-green-600 font-bold">
+                  <span>✅ Connected</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStripeOnboard}
+                  className="px-4 py-2 rounded-xl bg-blue-600 text-white shadow font-bold"
+                  disabled={loading}
+                >
+                  {loading ? "Redirecting..." : "Setup payouts"}
+                </button>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Required to receive auction payouts.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-4 justify-center">
+              <Link
+                href="/stream"
+                className="px-4 py-2 rounded-xl bg-green-600 text-white shadow font-bold"
               >
-                {loading ? "Redirecting..." : "Setup payouts"}
+                Go Live
+              </Link>
+
+              <button
+                onClick={logout}
+                className="px-4 py-2 rounded-xl bg-red-500 text-white shadow font-bold"
+              >
+                Logout
               </button>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              Required to receive auction payouts.
-            </p>
-          </div>
-
-          <div className="flex gap-3 mt-4">
-            <Link
-              href="/stream"
-              className="px-4 py-2 rounded bg-green-600 text-white shadow"
-            >
-              Go Live
-            </Link>
-
-            <button
-              onClick={logout}
-              className="px-4 py-2 rounded bg-red-500 text-white shadow"
-            >
-              Logout
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="rounded bg-blue-50 p-4 text-blue-700 mb-3">You’re not signed in.</div>
-          <button
-            onClick={loginWithGoogle}
-            className="px-4 py-2 rounded bg-blue-600 text-white shadow"
-          >
-            Sign in with Google
-          </button>
-        </>
-      )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded bg-blue-100 p-4 text-blue-900 mb-3 text-center font-semibold shadow">You’re not signed in.</div>
+            <div className="flex justify-center">
+              <button
+                onClick={loginWithGoogle}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white shadow font-bold"
+              >
+                Sign in with Google
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
