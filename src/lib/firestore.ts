@@ -12,6 +12,8 @@ import {
   orderBy,
   where,
   deleteDoc,
+  getDocs,
+  limit,
 } from "firebase/firestore";
 import type {
   DocumentData,
@@ -19,38 +21,34 @@ import type {
   CollectionReference,
 } from "firebase/firestore";
 
-// Get Firestore user doc with custom fields
+// --- Main App Functions ---
+
 export async function getUserDoc(uid: string): Promise<any | null> {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
 
-// Set stripeAccountId for user
 export async function setStripeAccountId(uid: string, stripeAccountId: string) {
   const ref = doc(db, "users", uid);
   await setDoc(ref, { stripeAccountId }, { merge: true });
 }
 
-// Add viewer to livestream
 export async function addViewer(channel: string, uid: string) {
   const ref = doc(db, `livestreams/${channel}/viewers/${uid}`);
   await setDoc(ref, { joinedAt: Date.now() }, { merge: true });
 }
 
-// Remove viewer from livestream
 export async function removeViewer(channel: string, uid: string) {
   const ref = doc(db, `livestreams/${channel}/viewers/${uid}`);
   await deleteDoc(ref);
 }
 
-// Listen to viewer count changes (returns unsubscribe)
 export function listenViewerCount(channel: string, cb: (count: number) => void) {
   const ref = collection(db, `livestreams/${channel}/viewers`);
   return onSnapshot(ref, (snap) => cb(snap.size));
 }
 
-// Place bid on item
 export async function placeBid(
   channel: string,
   itemId: string,
@@ -71,19 +69,29 @@ export async function placeBid(
   return { ok: true };
 }
 
-// Ensure stream exists (create if not)
 export async function ensureStream(channel: string, sellerUid: string) {
   const ref = doc(db, "livestreams", channel);
   await setDoc(ref, { sellerUid, createdAt: serverTimestamp() }, { merge: true });
 }
 
-// Add item to stream's queue
-export async function addQueueItem(channel: string, item: any) {
+export async function addQueueItem(channel: string, item: Record<string, any>) {
+  // Debug log for you!
+  console.log("addQueueItem received:", item, "type:", typeof item);
+
+  if (
+    !item ||
+    typeof item !== "object" ||
+    Array.isArray(item) ||
+    Object.prototype.toString.call(item) !== "[object Object]"
+  ) {
+    throw new Error(
+      `addQueueItem: item must be a plain object. Got: ${JSON.stringify(item)}`
+    );
+  }
   const ref = collection(db, `livestreams/${channel}/items`);
   await addDoc(ref, { ...item, status: "queued", createdAt: serverTimestamp() });
 }
 
-// Activate item (set status to active and endsAt)
 export async function activateItem(channel: string, itemId: string, durationSec: number) {
   const ref = doc(db, `livestreams/${channel}/items/${itemId}`);
   const endsAt = Date.now() + durationSec * 1000;
@@ -92,7 +100,6 @@ export async function activateItem(channel: string, itemId: string, durationSec:
   await updateDoc(streamRef, { currentItemId: itemId });
 }
 
-// Clear active item (set status to ended/sold)
 export async function clearActive(channel: string, itemId: string) {
   const ref = doc(db, `livestreams/${channel}/items/${itemId}`);
   await updateDoc(ref, { status: "ended", endedAt: serverTimestamp() });
@@ -100,19 +107,16 @@ export async function clearActive(channel: string, itemId: string) {
   await updateDoc(streamRef, { currentItemId: null });
 }
 
-// End stream (set status to ended)
 export async function endStream(channel: string) {
   const ref = doc(db, "livestreams", channel);
   await updateDoc(ref, { status: "ended", endedAt: serverTimestamp() });
 }
 
-// Update thumbnail for preview (call this every 5 min from your streamer)
 export async function updateStreamThumbnail(channel: string, thumbnailUrl: string) {
   const ref = doc(db, "livestreams", channel);
   await updateDoc(ref, { thumbnailUrl, thumbnailUpdatedAt: serverTimestamp() });
 }
 
-// Listen to chat messages
 export function listenMessages(channel: string, cb: (messages: any[]) => void) {
   const ref = collection(db, `livestreams/${channel}/messages`);
   const q = query(ref, orderBy("createdAt", "asc"));
@@ -121,7 +125,6 @@ export function listenMessages(channel: string, cb: (messages: any[]) => void) {
   });
 }
 
-// Send chat message
 export async function sendMessage(
   channel: string,
   uid: string,
@@ -137,7 +140,6 @@ export async function sendMessage(
   });
 }
 
-// Create order when auction ends
 export async function createOrder(order: {
   itemId: string,
   itemName: string,
@@ -153,13 +155,100 @@ export async function createOrder(order: {
   });
 }
 
-// Update order status
 export async function updateOrderStatus(orderId: string, status: string) {
   const ref = doc(db, "orders", orderId);
   await updateDoc(ref, { status });
 }
 
-// Existing exports...
+export async function getFeaturedStreams(): Promise<any[]> {
+  const q = query(
+    collection(db, "livestreams"),
+    where("status", "==", "live"),
+    where("featured", "==", true)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getPopularStreams(): Promise<any[]> {
+  const q = query(
+    collection(db, "livestreams"),
+    where("status", "==", "live"),
+    orderBy("viewerCount", "desc"),
+    limit(5)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getStreamsByFilter(
+  filter: { type: "" | "coral" | "fish" | "equipment"; sortBy: string }
+): Promise<any[]> {
+  let q: any = query(collection(db, "livestreams"), where("status", "==", "live"));
+  if (filter.type) {
+    q = query(q, where("type", "==", filter.type));
+  }
+  if (filter.sortBy === "viewers") {
+    q = query(q, orderBy("viewerCount", "desc"));
+  }
+  if (filter.sortBy === "rating") {
+    q = query(q, orderBy("rating", "desc"));
+  }
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getSellerAnalytics(sellerUid: string): Promise<any> {
+  // Sales
+  const ordersQ = query(collection(db, "orders"), where("sellerUid", "==", sellerUid), where("status", "in", ["pending", "completed"]));
+  const ordersSnap = await getDocs(ordersQ);
+  const sales = ordersSnap.docs.reduce((sum, d) => sum + (d.data().amount ?? 0), 0);
+  const itemsSold = ordersSnap.size;
+
+  // Monthly sales (sold in current month)
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthlyQ = query(
+    collection(db, "orders"),
+    where("sellerUid", "==", sellerUid),
+    where("createdAt", ">=", monthStart)
+  );
+  const monthlySnap = await getDocs(monthlyQ);
+  const monthlySales = monthlySnap.docs.reduce((sum, d) => sum + (d.data().amount ?? 0), 0);
+
+  // Rating/reviewCount from user doc
+  const user = await getUserDoc(sellerUid);
+  const rating = user?.rating ?? 0;
+  const reviewCount = user?.reviewCount ?? 0;
+
+  return { sales, itemsSold, monthlySales, rating, reviewCount };
+}
+
+export async function getMonthlyLeaderboard(): Promise<any[]> {
+  const usersSnap = await getDocs(collection(db, "users"));
+  const leaderboard: any[] = [];
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  for (const user of usersSnap.docs) {
+    const sellerUid = user.id;
+    const name = user.data().displayName ?? "Seller";
+    const monthlyQ = query(
+      collection(db, "orders"),
+      where("sellerUid", "==", sellerUid),
+      where("createdAt", ">=", monthStart)
+    );
+    const monthlySnap = await getDocs(monthlyQ);
+    const monthlySales = monthlySnap.docs.reduce((sum, d) => sum + (d.data().amount ?? 0), 0);
+    leaderboard.push({ sellerUid, name, monthlySales });
+  }
+
+  leaderboard.sort((a, b) => b.monthlySales - a.monthlySales);
+
+  return leaderboard.slice(0, 10); // top 10
+}
+
+// --- Firestore Helper Imports/Types ---
 export {
   doc,
   setDoc,
@@ -173,6 +262,8 @@ export {
   getDoc,
   where,
   deleteDoc,
+  getDocs,
+  limit,
 };
 
 export type { DocumentData, DocumentReference, CollectionReference };

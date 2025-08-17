@@ -201,6 +201,9 @@ export default function StreamPage() {
         await c.unpublish();
         await c.leave();
       }
+    } catch (err: any) {
+      alert("Failed to end stream: " + (err?.message ?? "Unknown error"));
+      console.error("End stream error:", err);
     } finally {
       setIsLive(false);
       setCam(null);
@@ -263,6 +266,9 @@ export default function StreamPage() {
         <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-6 text-center">Go Live</h1>
         <div className="text-xs text-gray-500 mb-2 text-center">
           Viewers watching: <span className="font-bold">{viewerCount}</span>
+        </div>
+        <div className="text-xs text-gray-500 mb-2 text-center">
+          Your UID: <span className="font-mono">{userUid}</span>
         </div>
         <div className="flex items-center gap-2 mb-2 justify-center">
           <label className="text-sm font-semibold">Channel:</label>
