@@ -74,10 +74,7 @@ export async function ensureStream(channel: string, sellerUid: string) {
   await setDoc(ref, { sellerUid, createdAt: serverTimestamp() }, { merge: true });
 }
 
-export async function addQueueItem(channel: string, item: Record<string, any>) {
-  // Debug log for you!
-  console.log("addQueueItem received:", item, "type:", typeof item);
-
+export async function addQueueItem(channel: string, item: Record<string, unknown>) {
   if (
     !item ||
     typeof item !== "object" ||
@@ -89,7 +86,7 @@ export async function addQueueItem(channel: string, item: Record<string, any>) {
     );
   }
   const ref = collection(db, `livestreams/${channel}/items`);
-  await addDoc(ref, { ...item, status: "queued", createdAt: serverTimestamp() });
+  await addDoc(ref, { ...(item as Record<string, any>), status: "queued", createdAt: serverTimestamp() });
 }
 
 export async function activateItem(channel: string, itemId: string, durationSec: number) {
@@ -121,7 +118,7 @@ export function listenMessages(channel: string, cb: (messages: any[]) => void) {
   const ref = collection(db, `livestreams/${channel}/messages`);
   const q = query(ref, orderBy("createdAt", "asc"));
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    cb(snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any> || {}) })));
   });
 }
 
@@ -167,7 +164,7 @@ export async function getFeaturedStreams(): Promise<any[]> {
     where("featured", "==", true)
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any> || {}) }));
 }
 
 export async function getPopularStreams(): Promise<any[]> {
@@ -178,7 +175,7 @@ export async function getPopularStreams(): Promise<any[]> {
     limit(5)
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any> || {}) }));
 }
 
 export async function getStreamsByFilter(
@@ -195,7 +192,7 @@ export async function getStreamsByFilter(
     q = query(q, orderBy("rating", "desc"));
   }
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any> || {}) }));
 }
 
 export async function getSellerAnalytics(sellerUid: string): Promise<any> {
