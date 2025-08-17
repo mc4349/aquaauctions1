@@ -61,7 +61,6 @@ export async function placeBid(
   const snap = await getDoc(ref);
   const data = snap.data();
   if (!data) return { ok: false };
-  // Only allow bid if auction is active and bid is valid
   if (data.status !== "active") return { ok: false };
   if (typeof data.highestBid === "number" && bid <= data.highestBid) return { ok: false };
   await updateDoc(ref, {
@@ -89,7 +88,6 @@ export async function activateItem(channel: string, itemId: string, durationSec:
   const ref = doc(db, `livestreams/${channel}/items/${itemId}`);
   const endsAt = Date.now() + durationSec * 1000;
   await updateDoc(ref, { status: "active", activatedAt: serverTimestamp(), endsAt });
-  // Update currentItemId at stream level
   const streamRef = doc(db, "livestreams", channel);
   await updateDoc(streamRef, { currentItemId: itemId });
 }
@@ -98,7 +96,6 @@ export async function activateItem(channel: string, itemId: string, durationSec:
 export async function clearActive(channel: string, itemId: string) {
   const ref = doc(db, `livestreams/${channel}/items/${itemId}`);
   await updateDoc(ref, { status: "ended", endedAt: serverTimestamp() });
-  // Remove currentItemId at stream level
   const streamRef = doc(db, "livestreams", channel);
   await updateDoc(streamRef, { currentItemId: null });
 }
@@ -107,6 +104,12 @@ export async function clearActive(channel: string, itemId: string) {
 export async function endStream(channel: string) {
   const ref = doc(db, "livestreams", channel);
   await updateDoc(ref, { status: "ended", endedAt: serverTimestamp() });
+}
+
+// Update thumbnail for preview (call this every 5 min from your streamer)
+export async function updateStreamThumbnail(channel: string, thumbnailUrl: string) {
+  const ref = doc(db, "livestreams", channel);
+  await updateDoc(ref, { thumbnailUrl, thumbnailUpdatedAt: serverTimestamp() });
 }
 
 // Listen to chat messages

@@ -11,6 +11,7 @@ type Stream = {
   sellerUid: string;
   status: string;
   startedAt?: any;
+  thumbnailUrl?: string;
 };
 
 export default function ExplorePage() {
@@ -31,6 +32,7 @@ export default function ExplorePage() {
           sellerUid: data.sellerUid,
           status: data.status,
           startedAt: data.startedAt,
+          thumbnailUrl: data.thumbnailUrl, // add thumbnail support
         });
       });
       setStreams(list);
@@ -58,6 +60,14 @@ export default function ExplorePage() {
                     Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
                   </span>
                 </div>
+                {/* Live preview thumbnail */}
+                {s.thumbnailUrl && (
+                  <img
+                    src={s.thumbnailUrl}
+                    alt={`Live preview of ${s.channel}`}
+                    className="w-full max-w-md rounded-lg shadow my-2"
+                  />
+                )}
                 <Link
                   href={`/live/${s.channel}`}
                   className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl shadow w-fit font-bold"

@@ -3,18 +3,39 @@
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useEffect, useState } from "react";
-import { getUserDoc } from "@/lib/firestore";
+import { getUserDoc, setDoc, doc } from "@/lib/firestore";
+import { updateProfile, sendPasswordResetEmail } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
 
 export default function AccountPage() {
   const { user, logout, loginWithGoogle } = useAuth();
   const [stripeStatus, setStripeStatus] = useState<"none" | "pending" | "connected">("none");
   const [loading, setLoading] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.displayName ?? "");
+  const [shipping, setShipping] = useState({
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingSaved, setShippingSaved] = useState(false);
+
+  // Load shipping info from Firestore
+  useEffect(() => {
+    async function loadShipping() {
+      if (!user) return;
+      const userDoc = await getUserDoc(user.uid);
+      if (userDoc?.shippingInfo) setShipping(userDoc.shippingInfo);
+      setDisplayName(user.displayName ?? userDoc?.displayName ?? "");
+    }
+    loadShipping();
+  }, [user]);
 
   useEffect(() => {
     async function checkStripe() {
       if (!user) return;
       setLoading(true);
-      // Get Firestore user doc
       const userDoc = await getUserDoc(user.uid);
       const stripeAccountId = userDoc?.stripeAccountId;
       if (!stripeAccountId) {
@@ -48,6 +69,30 @@ export default function AccountPage() {
     setLoading(false);
   };
 
+  const handleNameChange = async () => {
+    if (!user) return;
+    // Update Firebase Auth displayName
+    await updateProfile(user, { displayName });
+    // Also update in Firestore user doc
+    await setDoc(doc(db, "users", user.uid), { displayName }, { merge: true });
+    alert("Name updated!");
+  };
+
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    await sendPasswordResetEmail(auth, user.email);
+    alert("Password reset email sent!");
+  };
+
+  const handleShippingSave = async () => {
+    if (!user) return;
+    setShippingLoading(true);
+    await setDoc(doc(db, "users", user.uid), { shippingInfo: shipping }, { merge: true });
+    setShippingSaved(true);
+    setShippingLoading(false);
+    setTimeout(() => setShippingSaved(false), 2500);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
       <div className="space-y-8 max-w-lg mx-auto pt-12">
@@ -55,9 +100,81 @@ export default function AccountPage() {
         {user ? (
           <>
             <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow space-y-2">
-              <p><strong>Name:</strong> {user.displayName ?? "—"}</p>
+              <div className="mb-2">
+                <label className="block font-bold mb-1">Display Name:</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  className="border rounded px-3 py-2 w-full"
+                  disabled={loading}
+                />
+                <button
+                  onClick={handleNameChange}
+                  className="mt-2 px-4 py-2 rounded bg-teal-600 text-white font-bold shadow hover:bg-teal-700 disabled:opacity-50"
+                  disabled={loading}
+                >
+                  Change Name
+                </button>
+              </div>
               <p><strong>Email:</strong> {user.email}</p>
               <p><strong>UID:</strong> <span className="font-mono">{user.uid}</span></p>
+              {user.providerData?.[0]?.providerId === "password" && (
+                <button
+                  onClick={handlePasswordReset}
+                  className="mt-2 px-4 py-2 rounded bg-blue-600 text-white font-bold shadow hover:bg-blue-700"
+                >
+                  Reset Password
+                </button>
+              )}
+              {user.providerData?.[0]?.providerId === "google.com" && (
+                <div className="mt-2 text-teal-800 text-sm">
+                  Signed in with Google. To change Google account, logout and sign in with another account.
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow space-y-2">
+              <h2 className="font-semibold text-lg mb-2">Shipping Information</h2>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Address"
+                  value={shipping.address}
+                  onChange={e => setShipping({ ...shipping, address: e.target.value })}
+                  className="border rounded px-3 py-2 w-full"
+                />
+                <input
+                  type="text"
+                  placeholder="City"
+                  value={shipping.city}
+                  onChange={e => setShipping({ ...shipping, city: e.target.value })}
+                  className="border rounded px-3 py-2 w-full"
+                />
+                <input
+                  type="text"
+                  placeholder="State"
+                  value={shipping.state}
+                  onChange={e => setShipping({ ...shipping, state: e.target.value })}
+                  className="border rounded px-3 py-2 w-full"
+                />
+                <input
+                  type="text"
+                  placeholder="Zip"
+                  value={shipping.zip}
+                  onChange={e => setShipping({ ...shipping, zip: e.target.value })}
+                  className="border rounded px-3 py-2 w-full"
+                />
+                <button
+                  onClick={handleShippingSave}
+                  className="mt-2 px-4 py-2 rounded bg-teal-600 text-white font-bold shadow hover:bg-teal-700 disabled:opacity-50"
+                  disabled={shippingLoading}
+                >
+                  {shippingLoading ? "Saving..." : "Save Shipping Info"}
+                </button>
+                {shippingSaved && (
+                  <div className="text-green-700 text-sm mt-1">Saved!</div>
+                )}
+              </div>
             </div>
             <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow space-y-2">
               <h2 className="font-semibold text-lg mb-2">Payouts Setup</h2>
