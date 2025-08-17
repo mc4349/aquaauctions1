@@ -23,7 +23,7 @@ import {
   listenViewerCount,
   createOrder,
   getDoc,
-  deleteDoc, // <-- import for queue item delete
+  deleteDoc,
 } from "../../lib/firestore";
 import type { DocumentData } from "../../lib/firestore";
 
@@ -56,7 +56,6 @@ export default function StreamPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
 
-  // For timer and active item
   const [activeItem, setActiveItem] = useState<Item | null>(null);
   const [remaining, setRemaining] = useState<number>(0);
 
@@ -73,18 +72,14 @@ export default function StreamPage() {
   useEffect(() => {
     let disposed = false;
     let localClient: IAgoraRTCClient | null = null;
-
     (async () => {
       const { default: AgoraRTC } = await import("agora-rtc-sdk-ng");
       if (disposed) return;
-
       agoraRef.current = AgoraRTC;
-
       localClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
       clientRef.current = localClient;
       setClient(localClient);
     })();
-
     return () => {
       disposed = true;
       (async () => {
@@ -111,10 +106,8 @@ export default function StreamPage() {
     };
   }, []);
 
-  // Watch queue + current item + active item
   useEffect(() => {
     if (!channel) return;
-
     const q = query(
       collection(db, "livestreams", channel, "items"),
       orderBy("createdAt", "asc")
@@ -134,25 +127,20 @@ export default function StreamPage() {
         });
       });
       setItems(list);
-
-      // Find active item and update state
       const active = list.find(it => it.status === "active");
       setActiveItem(active || null);
     });
-
     const streamRef = doc(db, "livestreams", channel);
     const unsubStream = onSnapshot(streamRef, (d: any) => {
       const data = d.data() as DocumentData | undefined;
       setCurrentItemId(data?.currentItemId ?? null);
     });
-
     return () => {
       unsubItems();
       unsubStream();
     };
   }, [channel]);
 
-  // Timer for active item
   useEffect(() => {
     if (!activeItem?.endsAt) { setRemaining(0); return; }
     const id = setInterval(() => {
@@ -162,7 +150,6 @@ export default function StreamPage() {
     return () => clearInterval(id);
   }, [activeItem?.endsAt]);
 
-  // Viewer count (for streamer, real-time)
   useEffect(() => {
     const unsub = listenViewerCount(channel, setViewerCount);
     return () => unsub();
@@ -173,20 +160,16 @@ export default function StreamPage() {
     const c = clientRef.current;
     if (!userUid) return alert("Sign in first.");
     if (!AgoraRTC || !c) return alert("Video engine not ready yet—try again in a second.");
-
     await ensureStream(channel, userUid);
-
     await c.join(APP_ID, channel, TOKEN, null);
     const micTrack = await AgoraRTC.createMicrophoneAudioTrack();
     const camTrack = await AgoraRTC.createCameraVideoTrack();
     await c.publish([micTrack, camTrack]);
-
     micRef.current = micTrack;
     camRef.current = camTrack;
     setMic(micTrack);
     setCam(camTrack);
     setIsLive(true);
-
     if (videoRef.current) {
       const container = document.createElement("div");
       container.style.width = "100%";
@@ -204,7 +187,6 @@ export default function StreamPage() {
     const c = clientRef.current;
     try {
       await endStream(channel);
-
       if (camRef.current) {
         camRef.current.stop();
         camRef.current.close();
@@ -250,17 +232,12 @@ export default function StreamPage() {
     await activateItem(channel, id, dur);
   };
 
-  // --- UPDATED FUNCTION ---
   const endActive = async () => {
     if (!currentItemId) return;
     await clearActive(channel, currentItemId);
-
-    // Fetch item to get winning bidder and create order
     const itemRef = doc(db, `livestreams/${channel}/items/${currentItemId}`);
     const itemSnap = await getDoc(itemRef);
     const item = itemSnap.data();
-
-    // Only create order if there is a winner
     if (item?.highestBidderUid && typeof item?.highestBid === "number" && item?.name) {
       await createOrder({
         itemId: currentItemId,
@@ -271,24 +248,22 @@ export default function StreamPage() {
       });
     }
   };
-  // --- END UPDATED FUNCTION ---
 
-  // Delete a queue item
   const deleteQueueItem = async (itemId: string) => {
     await deleteDoc(doc(db, `livestreams/${channel}/items/${itemId}`));
   };
 
-  // queue form
   const [name, setName] = useState("");
   const [startingPrice, setStartingPrice] = useState(5);
   const [durationSec, setDurationSec] = useState(30);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
       <div className="space-y-10 max-w-3xl mx-auto pt-12">
-        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-6 text-center">Go Live</h1>
-        <div className="text-xs text-gray-500 mb-2 text-center">Viewers watching: <span className="font-bold">{viewerCount}</span></div>
-
+        <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-6 text-center">Go Live</h1>
+        <div className="text-xs text-gray-500 mb-2 text-center">
+          Viewers watching: <span className="font-bold">{viewerCount}</span>
+        </div>
         <div className="flex items-center gap-2 mb-2 justify-center">
           <label className="text-sm font-semibold">Channel:</label>
           <input
@@ -298,17 +273,15 @@ export default function StreamPage() {
             placeholder="channel-name"
           />
         </div>
-
         <div
           ref={videoRef}
           className="w-full flex justify-center bg-gray-100 rounded-lg py-2 shadow"
         />
-
         <div className="flex flex-wrap gap-3 mb-6 justify-center">
           {!isLive ? (
             <button
               onClick={start}
-              className="px-4 py-2 rounded-xl bg-green-600 text-white shadow font-bold"
+              className="px-4 py-2 rounded-xl bg-teal-600 text-white shadow font-bold"
             >
               Start Stream
             </button>
@@ -327,9 +300,7 @@ export default function StreamPage() {
             Toggle Mic
           </button>
         </div>
-
-        {/* Queue composer */}
-        <div className="rounded-xl border p-6 space-y-3 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow">
+        <div className="rounded-xl border p-6 space-y-3 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow">
           <h2 className="font-semibold text-lg mb-2">Add Item to Queue</h2>
           <div className="flex flex-wrap gap-3 items-center">
             <input
@@ -358,15 +329,13 @@ export default function StreamPage() {
             </select>
             <button
               onClick={addItem}
-              className="px-3 py-2 rounded-xl bg-black text-white shadow font-bold"
+              className="px-3 py-2 rounded-xl bg-teal-700 text-white shadow font-bold"
             >
               Add
             </button>
           </div>
         </div>
-
-        {/* Queue list */}
-        <div className="rounded-xl border p-6 space-y-2 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow">
+        <div className="rounded-xl border p-6 space-y-2 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow">
           <h2 className="font-semibold text-lg mb-2">Queue</h2>
           {items.length === 0 && (
             <p className="text-sm text-gray-500">No items yet.</p>
@@ -422,7 +391,6 @@ export default function StreamPage() {
             ))}
           </ul>
         </div>
-
         <p className="text-sm text-gray-500 mt-2 text-center">
           Only one item can be active at a time. Activating sets a countdown
           (endsAt) in Firestore for viewers.

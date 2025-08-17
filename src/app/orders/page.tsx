@@ -29,9 +29,9 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
       <div className="max-w-2xl mx-auto pt-12 space-y-10">
-        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-6 text-center">
+        <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-6 text-center">
           Seller Orders
         </h1>
         {orders.length === 0 && (
@@ -41,10 +41,10 @@ export default function OrdersPage() {
         )}
         <ul className="space-y-8">
           {orders.map(order => (
-            <li key={order.id} className="rounded-xl p-6 shadow-lg bg-gradient-to-tr from-white via-indigo-50 to-blue-100 border border-indigo-100 flex flex-col gap-2">
+            <li key={order.id} className="rounded-xl p-6 shadow-lg bg-gradient-to-tr from-white via-blue-50 to-teal-100 border border-teal-100 flex flex-col gap-2">
               <div className="flex justify-between items-center mb-2">
                 <div>
-                  <div className="font-bold text-lg text-indigo-700">{order.itemName}</div>
+                  <div className="font-bold text-lg text-teal-700">{order.itemName}</div>
                   <div className="text-xs text-gray-500">Buyer: <span className="font-mono">{order.buyerUid}</span></div>
                 </div>
                 <span className={`px-4 py-1 rounded-xl text-xs font-bold shadow

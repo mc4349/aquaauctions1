@@ -17,7 +17,6 @@ export default function ExplorePage() {
   const [streams, setStreams] = useState<Stream[]>([]);
 
   useEffect(() => {
-    // Listen for all "live" streams
     const q = query(
       collection(db, "livestreams"),
       where("status", "==", "live")
@@ -40,11 +39,11 @@ export default function ExplorePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
       <div className="space-y-8 max-w-2xl mx-auto pt-12">
-        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-2 text-center">Explore</h1>
-        <p className="text-gray-700 text-center">Search sellers, coral, fish, and equipment. <span className="italic text-xs">(Coming next)</span></p>
-        <h2 className="text-xl font-semibold mt-6 text-indigo-700">Live Streams</h2>
+        <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-2 text-center">Explore</h1>
+        <p className="text-blue-900 text-center">Search sellers, coral, fish, and equipment. <span className="italic text-xs">(Coming next)</span></p>
+        <h2 className="text-xl font-semibold mt-6 text-teal-700">Live Streams</h2>
         {streams.length === 0 ? (
           <div className="rounded bg-yellow-100 p-6 text-yellow-900 text-center font-semibold shadow">
             No sellers are live right now.
@@ -52,16 +51,16 @@ export default function ExplorePage() {
         ) : (
           <ul className="space-y-4">
             {streams.map((s) => (
-              <li key={s.id} className="border rounded-xl p-4 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow flex flex-col gap-2">
+              <li key={s.id} className="border rounded-xl p-4 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow flex flex-col gap-2">
                 <div>
-                  <span className="font-semibold text-lg text-indigo-700">{s.channel}</span>
+                  <span className="font-semibold text-lg text-teal-700">{s.channel}</span>
                   <span className="text-xs text-gray-500 ml-2">
                     Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
                   </span>
                 </div>
                 <Link
                   href={`/live/${s.channel}`}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl shadow w-fit font-bold"
+                  className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl shadow w-fit font-bold"
                 >
                   View Live Stream
                 </Link>

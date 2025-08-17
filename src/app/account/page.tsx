@@ -20,7 +20,6 @@ export default function AccountPage() {
       if (!stripeAccountId) {
         setStripeStatus("none");
       } else {
-        // Optionally: check account status from Stripe API if you want stricter verification
         setStripeStatus("connected");
       }
       setLoading(false);
@@ -39,7 +38,7 @@ export default function AccountPage() {
       });
       const data = await res.json();
       if (data.url) {
-        window.location.href = data.url; // Redirect to Stripe onboarding
+        window.location.href = data.url;
       } else {
         alert("Error: " + (data.error || "Could not get Stripe onboarding link"));
       }
@@ -50,19 +49,17 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
       <div className="space-y-8 max-w-lg mx-auto pt-12">
-        <h1 className="text-4xl font-black text-indigo-800 drop-shadow-sm mb-6 text-center">Account</h1>
-
+        <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-6 text-center">Account</h1>
         {user ? (
           <>
-            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow space-y-2">
+            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow space-y-2">
               <p><strong>Name:</strong> {user.displayName ?? "—"}</p>
               <p><strong>Email:</strong> {user.email}</p>
               <p><strong>UID:</strong> <span className="font-mono">{user.uid}</span></p>
             </div>
-
-            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-indigo-50 to-blue-100 shadow space-y-2">
+            <div className="rounded-xl border p-6 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow space-y-2">
               <h2 className="font-semibold text-lg mb-2">Payouts Setup</h2>
               {loading ? (
                 <p className="text-blue-600">Loading...</p>
@@ -83,15 +80,13 @@ export default function AccountPage() {
                 Required to receive auction payouts.
               </p>
             </div>
-
             <div className="flex gap-3 mt-4 justify-center">
               <Link
                 href="/stream"
-                className="px-4 py-2 rounded-xl bg-green-600 text-white shadow font-bold"
+                className="px-4 py-2 rounded-xl bg-teal-600 text-white shadow font-bold"
               >
                 Go Live
               </Link>
-
               <button
                 onClick={logout}
                 className="px-4 py-2 rounded-xl bg-red-500 text-white shadow font-bold"
