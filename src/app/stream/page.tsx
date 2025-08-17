@@ -21,6 +21,8 @@ import {
   orderBy,
   doc,
   listenViewerCount,
+  createOrder, // <-- ADDED
+  getDoc, // <-- ADDED for fetching item after ending
 } from "../../lib/firestore";
 import type { DocumentData } from "../../lib/firestore";
 
@@ -247,10 +249,28 @@ export default function StreamPage() {
     await activateItem(channel, id, dur);
   };
 
+  // --- UPDATED FUNCTION ---
   const endActive = async () => {
     if (!currentItemId) return;
     await clearActive(channel, currentItemId);
+
+    // Fetch item to get winning bidder and create order
+    const itemRef = doc(db, `livestreams/${channel}/items/${currentItemId}`);
+    const itemSnap = await getDoc(itemRef);
+    const item = itemSnap.data();
+
+    // Only create order if there is a winner
+    if (item?.highestBidderUid && typeof item?.highestBid === "number" && item?.name) {
+      await createOrder({
+        itemId: currentItemId,
+        itemName: item.name,
+        sellerUid: userUid!,
+        buyerUid: item.highestBidderUid,
+        amount: item.highestBid
+      });
+    }
   };
+  // --- END UPDATED FUNCTION ---
 
   // queue form
   const [name, setName] = useState("");

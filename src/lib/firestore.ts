@@ -134,6 +134,22 @@ export async function sendMessage(
   });
 }
 
+// Create order when auction ends
+export async function createOrder(order: {
+  itemId: string,
+  itemName: string,
+  sellerUid: string,
+  buyerUid: string,
+  amount: number
+}) {
+  const ref = collection(db, "orders");
+  await addDoc(ref, {
+    ...order,
+    status: "pending",
+    createdAt: serverTimestamp()
+  });
+}
+
 // Existing exports...
 export {
   doc,
