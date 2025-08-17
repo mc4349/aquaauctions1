@@ -12,8 +12,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-neutral-900 text-white font-sans min-h-screen">
         <AuthProvider>
+          {/* Main content container with bottom padding for NavBar */}
+          <main className="container mx-auto px-4 pt-4 pb-16 min-h-screen">
+            {children}
+          </main>
           <NavBar />
-          <div className="container mx-auto px-4 pt-4 pb-24 min-h-screen">{children}</div>
         </AuthProvider>
       </body>
     </html>

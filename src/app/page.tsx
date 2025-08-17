@@ -31,7 +31,9 @@ export default function HomePage() {
               >
                 Sign up
               </Link>
-              <p className="text-sm text-lime-400">Sign in or sign up to explore auctions and live streams.</p>
+              <p className="text-sm text-lime-400">
+                Sign in or sign up to explore auctions and live streams.
+              </p>
             </>
           ) : (
             <div className="flex flex-row justify-center gap-4">
