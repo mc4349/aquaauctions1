@@ -150,6 +150,12 @@ export async function createOrder(order: {
   });
 }
 
+// Update order status
+export async function updateOrderStatus(orderId: string, status: string) {
+  const ref = doc(db, "orders", orderId);
+  await updateDoc(ref, { status });
+}
+
 // Existing exports...
 export {
   doc,
