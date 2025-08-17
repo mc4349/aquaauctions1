@@ -248,7 +248,8 @@ export default function StreamPage() {
   };
 
   const endActive = async () => {
-    await clearActive(channel);
+    if (!currentItemId) return;
+    await clearActive(channel, currentItemId);
   };
 
   // queue form

@@ -7,9 +7,8 @@ import type {
   IRemoteAudioTrack,
   IRemoteVideoTrack,
 } from "agora-rtc-sdk-ng";
-import { onSnapshot, doc, getDoc, addViewer, removeViewer, listenViewerCount } from "@/lib/firestore";
+import { onSnapshot, doc, getDoc, addViewer, removeViewer, listenViewerCount, placeBid } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
-import { placeBid } from "@/lib/firestore";
 import Chat from "@/components/Chat";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -143,7 +142,7 @@ export default function LiveViewerPage() {
       setBidMsg(`Your bid must be greater than $${active.highestBid ?? 0}.`);
       return;
     }
-    const res = await placeBid(channel, active.id, bid, user.uid);
+    const res = await placeBid(channel, active.id, user.uid, bid);
     if (!res.ok) {
       setBidMsg("Bid failed (maybe someone outbid you first or timer ended). Try again.");
     } else {
