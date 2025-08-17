@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { HomeIcon, VideoCameraIcon, UserIcon, BellIcon } from "@heroicons/react/24/outline"; // Make sure you installed @heroicons/react
+import { HomeIcon, VideoCameraIcon, UserIcon, BellIcon } from "@heroicons/react/24/outline";
 
+// Bottom navigation bar with properly sized icons and labels
 export default function NavBar() {
   const pathname = usePathname();
-  const { user, loginWithGoogle, logout } = useAuth();
+  const { user } = useAuth();
 
-  // Mobile-style bottom tabs
+  // Define tabs for navigation
   const tabs = [
     {
       href: "/",
@@ -47,8 +48,11 @@ export default function NavBar() {
                 ? "text-lime-400"
                 : "text-white opacity-80 hover:opacity-100"
             }`}
+            style={{ minWidth: "60px" }} // Prevent icons from growing too large
           >
-            {t.icon}
+            <span className="flex items-center justify-center w-8 h-8">
+              {t.icon}
+            </span>
             <span>{t.label}</span>
           </Link>
         );
