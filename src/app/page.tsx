@@ -7,12 +7,12 @@ export default function HomePage() {
   const { user, loginWithGoogle } = useAuth();
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 flex flex-col items-center justify-center">
-      <div className="max-w-xl w-full space-y-8 rounded-2xl shadow-xl bg-gradient-to-tr from-white via-blue-50 to-teal-50 p-8 border border-blue-100">
-        <h1 className="text-5xl font-extrabold text-teal-700 text-center drop-shadow mb-4">
+    <main className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center pb-24">
+      <div className="max-w-xl w-full space-y-8 rounded-2xl shadow-xl bg-neutral-800 p-8 border border-neutral-700">
+        <h1 className="text-5xl font-extrabold text-lime-400 text-center drop-shadow mb-4">
           Welcome to Aqua Auctions
         </h1>
-        <p className="text-lg text-blue-900 text-center mb-4">
+        <p className="text-lg text-neutral-400 text-center mb-4">
           Dive into live auctions for coral, fish, and aquatic gear. Join streams, bid, and connect with fellow aquarists!
         </p>
 
@@ -21,35 +21,35 @@ export default function HomePage() {
             <>
               <button
                 onClick={loginWithGoogle}
-                className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-lg shadow-lg hover:bg-teal-600 transition"
+                className="btn-accent text-lg shadow-lg hover:bg-lime-300 transition"
               >
                 Sign in with Google
               </button>
               <Link
                 href="/signup"
-                className="px-6 py-3 rounded-full bg-teal-500 text-white font-bold text-lg shadow-lg hover:bg-blue-600 transition"
+                className="btn-accent text-lg shadow-lg hover:bg-lime-300 transition"
               >
                 Sign up
               </Link>
-              <p className="text-sm text-teal-700">Sign in or sign up to explore auctions and live streams.</p>
+              <p className="text-sm text-lime-400">Sign in or sign up to explore auctions and live streams.</p>
             </>
           ) : (
             <div className="flex flex-row justify-center gap-4">
               <Link
                 href="/explore"
-                className="px-6 py-3 rounded-full bg-teal-600 text-white font-bold text-lg shadow-lg hover:bg-blue-700 transition"
+                className="btn-accent text-lg shadow-lg hover:bg-lime-300 transition"
               >
                 Explore Auctions
               </Link>
               <Link
                 href="/stream"
-                className="px-6 py-3 rounded-full bg-cyan-600 text-white font-bold text-lg shadow-lg hover:bg-teal-700 transition"
+                className="btn-accent text-lg shadow-lg hover:bg-lime-300 transition"
               >
                 Go Live
               </Link>
               <Link
                 href="/account"
-                className="px-6 py-3 rounded-full bg-blue-700 text-white font-bold text-lg shadow-lg hover:bg-teal-600 transition"
+                className="btn-accent text-lg shadow-lg hover:bg-lime-300 transition"
               >
                 Account Dashboard
               </Link>
@@ -57,7 +57,7 @@ export default function HomePage() {
           )}
         </div>
       </div>
-      <footer className="mt-12 text-teal-800 text-sm opacity-70">
+      <footer className="mt-12 text-neutral-400 text-sm opacity-70">
         &copy; {new Date().getFullYear()} Aqua Auctions — Dive in!
       </footer>
     </main>

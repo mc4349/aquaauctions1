@@ -33,14 +33,12 @@ export default function LiveViewerPage() {
   const [bidMsg, setBidMsg] = useState<string>("");
   const [viewerCount, setViewerCount] = useState<number>(0);
 
-  // Access restriction: force login
   useEffect(() => {
     if (!user) {
       loginWithGoogle();
     }
   }, [user, loginWithGoogle]);
 
-  // Viewer presence tracking
   useEffect(() => {
     if (!user?.uid) return;
     addViewer(channel, user.uid);
@@ -49,15 +47,13 @@ export default function LiveViewerPage() {
     };
   }, [channel, user?.uid]);
 
-  // Listen for viewer count
   useEffect(() => {
     const unsub = listenViewerCount(channel, setViewerCount);
     return () => unsub();
   }, [channel]);
 
-  // Join and render remote stream with dynamic import
   useEffect(() => {
-    if (!user) return; // don't join if not logged in
+    if (!user) return;
     let mounted = true;
 
     (async () => {
@@ -107,7 +103,6 @@ export default function LiveViewerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, user]);
 
-  // Watch currentItemId and the active item doc
   useEffect(() => {
     const streamRef = doc(db, `livestreams/${channel}`);
     const unsub = onSnapshot(streamRef, async (snap) => {
@@ -125,7 +120,6 @@ export default function LiveViewerPage() {
     return () => unsub();
   }, [channel]);
 
-  // Countdown from endsAt
   useEffect(() => {
     const id = setInterval(() => {
       const ms = active?.endsAt ? Math.max(0, active.endsAt - Date.now()) : 0;
@@ -154,7 +148,7 @@ export default function LiveViewerPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <h2 className="text-xl font-semibold">Please sign in to view this live auction.</h2>
-        <button onClick={loginWithGoogle} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">
+        <button onClick={loginWithGoogle} className="mt-4 px-4 py-2 bg-lime-400 text-neutral-900 rounded font-bold shadow">
           Sign in with Google
         </button>
       </div>
@@ -162,19 +156,19 @@ export default function LiveViewerPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Live: {channel}</h1>
-      <div className="text-xs text-gray-500">Viewers: {viewerCount}</div>
-      <div ref={videoRef} className="w-full flex justify-center bg-gray-50 rounded-lg py-2" />
+    <div className="space-y-4 max-w-xl mx-auto pt-6 pb-8">
+      <h1 className="text-2xl font-semibold text-lime-400">Live: {channel}</h1>
+      <div className="text-xs text-neutral-400">Viewers: {viewerCount}</div>
+      <div ref={videoRef} className="w-full flex justify-center bg-neutral-800 rounded-xl py-2 mb-2" />
 
       {active.id ? (
-        <div className="rounded-lg border p-4 space-y-3">
+        <div className="rounded-xl bg-neutral-800 border border-neutral-700 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-semibold">{active.name ?? "Active Item"}</div>
-              <div className="text-sm text-gray-600">Highest bid: ${active.highestBid ?? 0}</div>
+              <div className="font-semibold text-white">{active.name ?? "Active Item"}</div>
+              <div className="text-sm text-neutral-400">Highest bid: ${active.highestBid ?? 0}</div>
             </div>
-            <div className="text-xl font-bold tabular-nums">
+            <div className="text-xl font-bold tabular-nums text-lime-400">
               {remaining}s
             </div>
           </div>
@@ -182,32 +176,32 @@ export default function LiveViewerPage() {
           <div className="flex gap-2 items-center">
             <input
               type="number"
-              className="border rounded px-2 py-1 w-32"
+              className="border rounded px-2 py-1 w-32 bg-neutral-900 text-white"
               value={bid}
               min={(active.highestBid ?? 0) + 1}
               onChange={(e) => setBid(parseFloat(e.target.value || "0"))}
             />
             {user ? (
-              <button onClick={onPlaceBid} className="px-3 py-2 rounded bg-green-600 text-white">
+              <button onClick={onPlaceBid} className="btn-accent">
                 Place Bid
               </button>
             ) : (
-              <button onClick={loginWithGoogle} className="px-3 py-2 rounded bg-blue-600 text-white">
+              <button onClick={loginWithGoogle} className="btn-accent bg-blue-600">
                 Sign in to Bid
               </button>
             )}
           </div>
-          {bidMsg && <p className="text-sm text-gray-600">{bidMsg}</p>}
+          {bidMsg && <p className="text-sm text-lime-400">{bidMsg}</p>}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No active item yet.</p>
+        <p className="text-sm text-neutral-400">No active item yet.</p>
       )}
 
       {/* Chat */}
       <Chat channel={channel} />
 
-      <p className="text-sm text-gray-500">
-        Bids must increase and only count while the item is active. We’ll add payments with Stripe next.
+      <p className="text-sm text-neutral-400">
+        Bids must increase and only count while the item is active. Payments with Stripe coming soon.
       </p>
     </div>
   );

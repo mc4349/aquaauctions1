@@ -6,7 +6,7 @@ import {
   getFeaturedStreams,
   getPopularStreams,
   getStreamsByFilter,
-} from "@/lib/firestore"; // new utility functions
+} from "@/lib/firestore";
 
 type Stream = {
   id: string;
@@ -15,7 +15,7 @@ type Stream = {
   status: string;
   startedAt?: any;
   thumbnailUrl?: string;
-  type?: "coral" | "fish" | "equipment";
+  type?: "" | "coral" | "fish" | "equipment";
   viewerCount?: number;
   rating?: number;
   reviewCount?: number;
@@ -27,6 +27,13 @@ type FilterOptions = {
   sortBy: "viewers" | "rating" | "";
 };
 
+const FILTERS = [
+  { type: "", icon: "🌴", label: "All" },
+  { type: "coral", icon: "🪸", label: "Coral" },
+  { type: "fish", icon: "🐟", label: "Fish" },
+  { type: "equipment", icon: "⚙️", label: "Equipment" },
+];
+
 export default function ExplorePage() {
   const [featuredStreams, setFeaturedStreams] = useState<Stream[]>([]);
   const [popularStreams, setPopularStreams] = useState<Stream[]>([]);
@@ -36,173 +43,202 @@ export default function ExplorePage() {
     sortBy: "",
   });
 
-  // Featured streams
   useEffect(() => {
     getFeaturedStreams().then(setFeaturedStreams);
   }, []);
 
-  // Popular streams
   useEffect(() => {
     getPopularStreams().then(setPopularStreams);
   }, []);
 
-  // Filtered streams
   useEffect(() => {
     getStreamsByFilter(filter).then(setStreams);
   }, [filter]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-cyan-200 pb-20">
-      <div className="space-y-8 max-w-3xl mx-auto pt-12">
-        <h1 className="text-4xl font-black text-teal-700 drop-shadow-sm mb-2 text-center">Explore</h1>
-        <p className="text-blue-900 text-center">
-          Search sellers, coral, fish, and equipment. <span className="italic text-xs">(Now with filters, featured, leaderboard)</span>
+    <div className="min-h-screen bg-neutral-900 text-white pb-24">
+      <div className="max-w-md mx-auto pt-8">
+        <h1 className="text-3xl font-black mb-2 text-center text-white drop-shadow">Explore</h1>
+        <p className="text-neutral-400 text-center mb-4 text-sm">
+          Search sellers, coral, fish, and equipment.
         </p>
 
+        {/* Search bar */}
+        <div className="mb-4 px-2">
+          <input
+            className="w-full rounded-full bg-neutral-800 text-white placeholder:text-neutral-400 px-4 py-2 border-none outline-none"
+            placeholder="Search live streams..."
+          />
+        </div>
+
         {/* FILTERS */}
-        <div className="flex gap-3 flex-wrap items-center justify-center mb-6">
-          <label>Type:</label>
-          <select
-            value={filter.type}
-            onChange={e => setFilter(f => ({ ...f, type: e.target.value as any }))}
-            className="border rounded px-2 py-1"
-          >
-            <option value="">All</option>
-            <option value="coral">Coral</option>
-            <option value="fish">Fish</option>
-            <option value="equipment">Equipment</option>
-          </select>
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+          {FILTERS.map(f => (
+            <button
+              key={f.type}
+              onClick={() =>
+                setFilter(x => ({
+                  ...x,
+                  type: f.type as "" | "coral" | "fish" | "equipment",
+                }))
+              }
+              className={`flex items-center gap-1 px-4 py-2 rounded-full text-sm font-semibold transition ${
+                filter.type === f.type
+                  ? "bg-white text-neutral-900 shadow"
+                  : "bg-neutral-800 text-white"
+              }`}
+            >
+              <span>{f.icon}</span>
+              <span>{f.label}</span>
+            </button>
+          ))}
+          {/* Sort */}
           <button
-            className={`px-3 py-1 rounded-xl ${filter.sortBy === "viewers" ? "bg-teal-700 text-white" : "bg-gray-200"} shadow font-bold`}
-            onClick={() => setFilter(f => ({ ...f, sortBy: "viewers" }))}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+              filter.sortBy === "viewers"
+                ? "bg-white text-neutral-900 shadow"
+                : "bg-neutral-800 text-white"
+            }`}
+            onClick={() =>
+              setFilter(f => ({
+                ...f,
+                sortBy: "viewers" as "viewers" | "rating" | "",
+              }))
+            }
           >
-            Most Viewers
+            👀 Most Viewers
           </button>
           <button
-            className={`px-3 py-1 rounded-xl ${filter.sortBy === "rating" ? "bg-teal-700 text-white" : "bg-gray-200"} shadow font-bold`}
-            onClick={() => setFilter(f => ({ ...f, sortBy: "rating" }))}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+              filter.sortBy === "rating"
+                ? "bg-white text-neutral-900 shadow"
+                : "bg-neutral-800 text-white"
+            }`}
+            onClick={() =>
+              setFilter(f => ({
+                ...f,
+                sortBy: "rating" as "viewers" | "rating" | "",
+              }))
+            }
           >
-            Best Rated
+            ⭐ Best Rated
           </button>
         </div>
 
         {/* FEATURED */}
-        <h2 className="text-xl font-bold text-teal-700 mb-2">Featured Live Streams</h2>
-        <ul className="space-y-4">
+        <h2 className="text-lg font-bold text-white mb-2">Featured Live Streams</h2>
+        <div className="grid grid-cols-1 gap-4">
           {featuredStreams.length === 0 ? (
-            <div className="rounded bg-yellow-100 p-6 text-yellow-900 text-center font-semibold shadow">No featured streams.</div>
+            <div className="rounded-xl bg-yellow-200/50 p-6 text-yellow-900 text-center font-semibold shadow">No featured streams.</div>
           ) : (
             featuredStreams.map((s) => (
-              <li key={s.id} className="border rounded-xl p-4 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-lg text-teal-700">{s.channel}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
-                  </span>
-                  {s.type && (
-                    <span className="ml-2 text-xs bg-cyan-200 px-2 py-1 rounded">{s.type}</span>
-                  )}
+              <div key={s.id} className="bg-neutral-800 rounded-2xl overflow-hidden shadow-md flex flex-col">
+                <div className="relative">
+                  <img
+                    src={s.thumbnailUrl || "/default-thumb.jpg"}
+                    alt={`Live preview of ${s.channel}`}
+                    className="w-full h-40 object-cover"
+                  />
+                  <span className="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold">LIVE</span>
+                  <span className="absolute top-2 right-2 bg-neutral-700 px-2 py-1 rounded text-xs flex items-center gap-1">👀 {s.viewerCount ?? "?"}</span>
                 </div>
-                <img
-                  src={s.thumbnailUrl || "/default-thumb.jpg"}
-                  alt={`Live preview of ${s.channel}`}
-                  className="w-full max-w-md rounded-lg shadow my-2"
-                />
-                <div className="flex gap-4 items-center">
-                  <span className="text-xs text-gray-600">Viewers: {s.viewerCount ?? "?"}</span>
-                  <span className="text-xs text-gray-600">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</span>
+                <div className="p-3">
+                  <div className="font-bold">{s.channel}</div>
+                  <div className="text-xs text-neutral-400">
+                    Started: {s.startedAt?.toDate?.()?.toLocaleString?.() ?? ""}
+                  </div>
+                  <div className="mt-2 text-xs">{s.type && <span className="bg-neutral-700 px-2 py-1 rounded">{s.type}</span>}</div>
+                  <div className="mt-2 text-xs text-neutral-400">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</div>
+                  <Link
+                    href={`/live/${s.channel}`}
+                    className="mt-3 px-4 py-2 bg-lime-400 font-bold text-neutral-900 rounded-xl shadow w-fit"
+                  >
+                    View Live Stream
+                  </Link>
                 </div>
-                <Link
-                  href={`/live/${s.channel}`}
-                  className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl shadow w-fit font-bold"
-                >
-                  View Live Stream
-                </Link>
-              </li>
+              </div>
             ))
           )}
-        </ul>
+        </div>
 
         {/* POPULAR */}
-        <h2 className="text-xl font-bold text-teal-700 mb-2 mt-8">Most Popular Live Streams</h2>
-        <ul className="space-y-4">
+        <h2 className="text-lg font-bold text-white mb-2 mt-8">Most Popular Live Streams</h2>
+        <div className="grid grid-cols-1 gap-4">
           {popularStreams.length === 0 ? (
-            <div className="rounded bg-yellow-100 p-6 text-yellow-900 text-center font-semibold shadow">No popular streams.</div>
+            <div className="rounded-xl bg-yellow-200/50 p-6 text-yellow-900 text-center font-semibold shadow">No popular streams.</div>
           ) : (
             popularStreams.map((s) => (
-              <li key={s.id} className="border rounded-xl p-4 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-lg text-teal-700">{s.channel}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
-                  </span>
-                  {s.type && (
-                    <span className="ml-2 text-xs bg-cyan-200 px-2 py-1 rounded">{s.type}</span>
-                  )}
+              <div key={s.id} className="bg-neutral-800 rounded-2xl overflow-hidden shadow-md flex flex-col">
+                <div className="relative">
+                  <img
+                    src={s.thumbnailUrl || "/default-thumb.jpg"}
+                    alt={`Popular preview of ${s.channel}`}
+                    className="w-full h-40 object-cover"
+                  />
+                  <span className="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold">LIVE</span>
+                  <span className="absolute top-2 right-2 bg-neutral-700 px-2 py-1 rounded text-xs flex items-center gap-1">👀 {s.viewerCount ?? "?"}</span>
                 </div>
-                <img
-                  src={s.thumbnailUrl || "/default-thumb.jpg"}
-                  alt={`Popular preview of ${s.channel}`}
-                  className="w-full max-w-md rounded-lg shadow my-2"
-                />
-                <div className="flex gap-4 items-center">
-                  <span className="text-xs text-gray-600">Viewers: {s.viewerCount ?? "?"}</span>
-                  <span className="text-xs text-gray-600">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</span>
+                <div className="p-3">
+                  <div className="font-bold">{s.channel}</div>
+                  <div className="text-xs text-neutral-400">
+                    Started: {s.startedAt?.toDate?.()?.toLocaleString?.() ?? ""}
+                  </div>
+                  <div className="mt-2 text-xs">{s.type && <span className="bg-neutral-700 px-2 py-1 rounded">{s.type}</span>}</div>
+                  <div className="mt-2 text-xs text-neutral-400">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</div>
+                  <Link
+                    href={`/live/${s.channel}`}
+                    className="mt-3 px-4 py-2 bg-lime-400 font-bold text-neutral-900 rounded-xl shadow w-fit"
+                  >
+                    View Live Stream
+                  </Link>
                 </div>
-                <Link
-                  href={`/live/${s.channel}`}
-                  className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl shadow w-fit font-bold"
-                >
-                  View Live Stream
-                </Link>
-              </li>
+              </div>
             ))
           )}
-        </ul>
+        </div>
 
         {/* FILTERED */}
-        <h2 className="text-xl font-semibold mt-6 text-teal-700">All Live Streams</h2>
+        <h2 className="text-lg font-semibold mt-6 text-white">All Live Streams</h2>
         {streams.length === 0 ? (
-          <div className="rounded bg-yellow-100 p-6 text-yellow-900 text-center font-semibold shadow">
+          <div className="rounded-xl bg-yellow-200/50 p-6 text-yellow-900 text-center font-semibold shadow">
             No sellers are live right now.
           </div>
         ) : (
-          <ul className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
             {streams.map((s) => (
-              <li key={s.id} className="border rounded-xl p-4 bg-gradient-to-tr from-white via-blue-50 to-teal-100 shadow flex flex-col gap-2">
-                <div>
-                  <span className="font-semibold text-lg text-teal-700">{s.channel}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    Started: {s.startedAt?.toDate?.().toLocaleString?.() ?? ""}
-                  </span>
-                  {s.type && (
-                    <span className="ml-2 text-xs bg-cyan-200 px-2 py-1 rounded">{s.type}</span>
-                  )}
+              <div key={s.id} className="bg-neutral-800 rounded-2xl overflow-hidden shadow-md flex flex-col">
+                <div className="relative">
+                  <img
+                    src={s.thumbnailUrl || "/default-thumb.jpg"}
+                    alt={`Preview of ${s.channel}`}
+                    className="w-full h-40 object-cover"
+                  />
+                  <span className="absolute top-2 left-2 bg-red-600 text-xs px-2 py-1 rounded font-bold">LIVE</span>
+                  <span className="absolute top-2 right-2 bg-neutral-700 px-2 py-1 rounded text-xs flex items-center gap-1">👀 {s.viewerCount ?? "?"}</span>
                 </div>
-                <img
-                  src={s.thumbnailUrl || "/default-thumb.jpg"}
-                  alt={`Preview of ${s.channel}`}
-                  className="w-full max-w-md rounded-lg shadow my-2"
-                />
-                <div className="flex gap-4 items-center">
-                  <span className="text-xs text-gray-600">Viewers: {s.viewerCount ?? "?"}</span>
-                  <span className="text-xs text-gray-600">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</span>
+                <div className="p-3">
+                  <div className="font-bold">{s.channel}</div>
+                  <div className="text-xs text-neutral-400">
+                    Started: {s.startedAt?.toDate?.()?.toLocaleString?.() ?? ""}
+                  </div>
+                  <div className="mt-2 text-xs">{s.type && <span className="bg-neutral-700 px-2 py-1 rounded">{s.type}</span>}</div>
+                  <div className="mt-2 text-xs text-neutral-400">Rating: {s.rating ?? "—"} ({s.reviewCount ?? 0})</div>
+                  <Link
+                    href={`/live/${s.channel}`}
+                    className="mt-3 px-4 py-2 bg-lime-400 font-bold text-neutral-900 rounded-xl shadow w-fit"
+                  >
+                    View Live Stream
+                  </Link>
                 </div>
-                <Link
-                  href={`/live/${s.channel}`}
-                  className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl shadow w-fit font-bold"
-                >
-                  View Live Stream
-                </Link>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
 
-        {/* LEADERBOARD */}
-        <div className="mt-12">
+        {/* LEADERBOARD LINK */}
+        <div className="mt-12 mb-4">
           <Link href="/analytics" className="block text-center">
-            <span className="text-teal-700 font-bold underline text-lg">
+            <span className="text-lime-400 font-bold underline text-lg">
               View Seller Leaderboard & Analytics →
             </span>
           </Link>
