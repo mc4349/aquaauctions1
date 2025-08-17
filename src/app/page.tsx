@@ -25,10 +25,16 @@ export default function HomePage() {
               >
                 Sign in with Google
               </button>
-              <p className="text-sm text-teal-700">Sign in to explore auctions and live streams.</p>
+              <Link
+                href="/signup"
+                className="px-6 py-3 rounded-full bg-teal-500 text-white font-bold text-lg shadow-lg hover:bg-blue-600 transition"
+              >
+                Sign up
+              </Link>
+              <p className="text-sm text-teal-700">Sign in or sign up to explore auctions and live streams.</p>
             </>
           ) : (
-            <>
+            <div className="flex flex-row justify-center gap-4">
               <Link
                 href="/explore"
                 className="px-6 py-3 rounded-full bg-teal-600 text-white font-bold text-lg shadow-lg hover:bg-blue-700 transition"
@@ -36,12 +42,18 @@ export default function HomePage() {
                 Explore Auctions
               </Link>
               <Link
+                href="/stream"
+                className="px-6 py-3 rounded-full bg-cyan-600 text-white font-bold text-lg shadow-lg hover:bg-teal-700 transition"
+              >
+                Go Live
+              </Link>
+              <Link
                 href="/account"
-                className="px-6 py-3 rounded-full bg-cyan-600 text-white font-bold text-lg shadow-lg hover:bg-blue-700 transition"
+                className="px-6 py-3 rounded-full bg-blue-700 text-white font-bold text-lg shadow-lg hover:bg-teal-600 transition"
               >
                 Account Dashboard
               </Link>
-            </>
+            </div>
           )}
         </div>
       </div>
